@@ -15,7 +15,7 @@ cggr(
   tol = 1e-08,
   nfolds = 5,
   verbose = FALSE,
-  parallel = TRUE
+  ncores = 1
 )
 }
 \arguments{
@@ -39,7 +39,7 @@ cggr(
 
 \item{verbose}{If TRUE, prints progress messages. Default is FALSE.}
 
-\item{parallel}{If TRUE, runs the nodewise regressions in parallel. Default is TRUE.}
+\item{ncores}{Runs the nodewise regressions in parallel using that many cores. Default is 1.}
 }
 \description{
 Run canonical Gaussian graphical regression with covariates

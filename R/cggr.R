@@ -10,15 +10,16 @@
 #' @param tol The convergence threshhold for optimization. Default is \eqn{10^{-8}}
 #' @param nfolds Number of folds for cross-validation. Default is 5.
 #' @param verbose If TRUE, prints progress messages. Default is FALSE.
-#' @param parallel If TRUE, runs the nodewise regressions in parallel. Default is TRUE.
+#' @param ncores Runs the nodewise regressions in parallel using that many cores. Default is 1.
 #' @useDynLib cggr
 #' @importFrom Rcpp sourceCpp
 #' @importFrom abind abind
+#' @import parallel
 #' @export
 cggr <- function(responses, covariates, asparse,
                  nregmean = 10, nlambda = 100, lambdafactor = 1e-4,
                  maxit = 3e6, tol = 1e-8, nfolds = 5,
-                 verbose = FALSE, parallel = TRUE) {
+                 verbose = FALSE, ncores = 1) {
 
   stopifnot(is.matrix(responses), is.matrix(covariates),
             nrow(responses) == nrow(covariates),
@@ -61,7 +62,7 @@ cggr <- function(responses, covariates, asparse,
   if (verbose) {
     cat("Begin initial run...\n")
   }
-  if (parallel) {
+  if (ncores > 1) {
     reg_result <- parallel::mclapply(seq_len(p), nodewise, mc.cores = 10L)
   } else {
     reg_result <- lapply(seq_len(p), nodewise)
@@ -96,7 +97,7 @@ cggr <- function(responses, covariates, asparse,
     return(cv_result)
   }
 
-  if (parallel) {
+  if (ncores > 1) {
     cv_results <- parallel::mclapply(seq_len(p), cv_node, mc.cores = 10L)
   } else {
     cv_results <- lapply(seq_len(p), cv_node)

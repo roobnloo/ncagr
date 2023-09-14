@@ -5,3 +5,4 @@
 ^scratch$
 ^LICENSE\.md$
 ^compile_flags\.txt$
+^\.lintr$
