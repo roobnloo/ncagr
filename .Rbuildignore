@@ -1,0 +1,7 @@
+^\.devcontainer$
+^\.vscode$
+^\.git$
+^\.gitignore$
+^scratch$
+^LICENSE\.md$
+^compile_flags\.txt$

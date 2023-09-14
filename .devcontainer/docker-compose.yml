@@ -1,0 +1,16 @@
+version: '3'
+
+services:
+
+  rstudio:
+
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    environment:
+      PASSWORD: 'asdfasdf'
+      ROOT: 'TRUE'
+
+    volumes:
+      - ..:/home/rstudio/cggr:cached

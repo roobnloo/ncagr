@@ -1,0 +1,40 @@
+{
+	"name": "cggr-dev",
+
+	"dockerComposeFile": "docker-compose.yml",
+	"service": "rstudio",
+
+	// rstudio port forwarding
+	// "forwardPorts": [8787],
+	// "portsAttributes": {
+	// 	"8787": {
+	// 		"label": "RStudio",
+	// 		"requireLocalPort": true,
+	// 		"onAutoForward": "ignore"
+	// 	}
+	// },
+
+	"workspaceFolder": "/home/rstudio/cggr",
+	"remoteUser": "rstudio",
+
+	"customizations": {
+
+		"vscode": {
+			"settings": {
+				"python.defaultInterpreterPath": "/opt/conda/bin/python",
+				"r.rterm.linux": "/opt/conda/bin/radian",
+				"r.rpath.linux": "/usr/local/bin/R",
+				"r.bracketedPaste": true,
+				"r.plot.useHttpgd": true
+			},
+			"extensions": [
+				"reditorsupport.r",
+				"RDebugger.r-debugger",
+				"quarto.quarto",
+				"tomoki1207.pdf",
+				"llvm-vs-code-extensions.vscode-clangd",
+				"GitHub.copilot"
+			]
+		}
+	}
+}

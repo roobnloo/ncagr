@@ -1,0 +1,6 @@
+-I
+/usr/local/lib/R/site-library/RcppEigen/include
+-I
+/usr/local/lib/R/site-library/Rcpp/include
+-I
+/usr/local/lib/R/include
