@@ -47,7 +47,7 @@ cggr <- function(responses, covariates, asparse,
       nregmean = nregmean, nlambda = nlambda, lambdaFactor = lambdafactor,
       maxit = maxit, tol = tol)
     if (verbose)
-      print(paste("Finished initial run for node", node))
+      message("Finished initial run for node ", node)
     return(list(
       lambdas = nodereg["lambdas"][[1]],
       regmeanpath = nodereg["regmeans"][[1]],
@@ -60,10 +60,10 @@ cggr <- function(responses, covariates, asparse,
   }
 
   if (verbose) {
-    cat("Begin initial run...\n")
+    message("Begin initial run...\n")
   }
   if (ncores > 1) {
-    reg_result <- parallel::mclapply(seq_len(p), nodewise, mc.cores = 10L)
+    reg_result <- parallel::mclapply(seq_len(p), nodewise, mc.cores = ncores)
   } else {
     reg_result <- lapply(seq_len(p), nodewise)
   }
@@ -79,8 +79,8 @@ cggr <- function(responses, covariates, asparse,
   }
 
   if (verbose) {
-    print("Finished initial run")
-    print("Begin cross-validation...")
+    message("Finished initial run")
+    message("Begin cross-validation...")
   }
 
   cv_lambda_idx <- vector(length = p)
@@ -93,7 +93,7 @@ cggr <- function(responses, covariates, asparse,
       lambdas[, node], regmeanpaths[, node],
       maxit, tol, nfolds)
     if (verbose)
-      print(paste("Done cross-validating node", node))
+      message("Done cross-validating node ", node)
     return(cv_result)
   }
 
@@ -115,7 +115,7 @@ cggr <- function(responses, covariates, asparse,
   }
 
   if (verbose) {
-    print("Finished cross validating all nodes")
+    message("Finished cross validating all nodes")
   }
 
   ghat_select <- cbind(rep(seq(q), times = p),
