@@ -1,11 +1,11 @@
-Package: cggr
+Package: ncagr
 Type: Package
-Title: Graphical Models with Covariates via Canonical Parameterization
+Title: Natural Covariate-adjusted Graphical Regression
 Version: 0.1
 Date: 2023-09-14
 Author: Robin Liu
 Maintainer: Robin Liu <r_liu@pstat.ucsb.edu>
-Description: Estimates the covariate-dependent precision matrix of a multivariate normal distribution using neighborhood selection.
+Description: Estimates the covariate-dependent graphical model using neighborhood selection.
 License: MIT + file LICENSE
 Imports: Rcpp (>= 1.0.10), abind
 LinkingTo: Rcpp, RcppEigen

@@ -1,4 +1,4 @@
-cv_cggr_node <- function(node, responses, covariates, asparse,
+cv_ncagr_node <- function(node, responses, covariates, asparse,
                          lambdapath, regmeanpath,
                          maxit, tol, nfolds,
                          verbose = FALSE) {
@@ -39,7 +39,7 @@ cv_cggr_node <- function(node, responses, covariates, asparse,
                   intx_test %*% beta
     mses[i, ] <- apply(resid_test, 2, \(x) sum(x^2) / (ntest - 1))
     if (verbose)
-      print(paste("Finished CV fold", i))
+      message("Finished CV fold ", i)
   }
 
   dim(mses) <- c(nfolds, nlambda, nregmean)

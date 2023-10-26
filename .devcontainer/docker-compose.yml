@@ -13,4 +13,4 @@ services:
       ROOT: 'TRUE'
 
     volumes:
-      - ..:/home/rstudio/cggr:cached
+      - ..:/home/rstudio/ncagr:cached

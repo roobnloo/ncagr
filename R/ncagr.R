@@ -1,4 +1,4 @@
-#' Run canonical Gaussian graphical regression with covariates
+#' Run Natural Covariate-adjusted Graphical Regression
 #'
 #' @param responses \eqn{n x p} matrix of responses
 #' @param covariates \eqn{n x q} matrix of covariates
@@ -11,12 +11,12 @@
 #' @param nfolds Number of folds for cross-validation. Default is 5.
 #' @param verbose If TRUE, prints progress messages. Default is FALSE.
 #' @param ncores Runs the nodewise regressions in parallel using that many cores. Default is 1.
-#' @useDynLib cggr
+#' @useDynLib ncagr
 #' @importFrom Rcpp sourceCpp
 #' @importFrom abind abind
 #' @import parallel
 #' @export
-cggr <- function(responses, covariates, asparse,
+ncagr <- function(responses, covariates, asparse,
                  nregmean = 10, nlambda = 100, lambdafactor = 1e-4,
                  maxit = 3e6, tol = 1e-8, nfolds = 5,
                  verbose = FALSE, ncores = 1) {
@@ -88,7 +88,7 @@ cggr <- function(responses, covariates, asparse,
   cv_mse <- array(dim = c(p, nlambda, nregmean))
 
   cv_node <- function(node) {
-    cv_result <- cv_cggr_node(
+    cv_result <- cv_ncagr_node(
       node, responses, covariates, asparse,
       lambdas[, node], regmeanpaths[, node],
       maxit, tol, nfolds)
@@ -98,7 +98,7 @@ cggr <- function(responses, covariates, asparse,
   }
 
   if (ncores > 1) {
-    cv_results <- parallel::mclapply(seq_len(p), cv_node, mc.cores = 10L)
+    cv_results <- parallel::mclapply(seq_len(p), cv_node, mc.cores = ncores)
   } else {
     cv_results <- lapply(seq_len(p), cv_node)
   }
@@ -142,8 +142,8 @@ cggr <- function(responses, covariates, asparse,
   # Returns the estimated precision matrix of the ith observation
   precision <- function(i) {
     Theta <- apply(bhat_symm, c(1, 2), \(b) b %*% c(1, covariates[i, ]))
-    omega <- -1 * Theta
-    diag(omega) <- 1 / varhat
+    diag(Theta) <- -1
+    omega <- -1 * diag(1 / varhat) %*% Theta
     return(omega)
   }
 

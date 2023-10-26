@@ -2,6 +2,6 @@
 # Generator token: 10BE3573-1514-4C36-9D1C-5A225CD40393
 
 NodewiseRegression <- function(y, response, covariates, asparse, regmeanPath = as.numeric( c()), nregmean = 10L, lambdaPath = as.numeric( c()), nlambda = 100L, lambdaFactor = 1e-4, maxit = 1000L, tol = 1e-8, verbose = TRUE) {
-    .Call('_cggr_NodewiseRegression', PACKAGE = 'cggr', y, response, covariates, asparse, regmeanPath, nregmean, lambdaPath, nlambda, lambdaFactor, maxit, tol, verbose)
+    .Call('_ncagr_NodewiseRegression', PACKAGE = 'ncagr', y, response, covariates, asparse, regmeanPath, nregmean, lambdaPath, nlambda, lambdaFactor, maxit, tol, verbose)
 }
 

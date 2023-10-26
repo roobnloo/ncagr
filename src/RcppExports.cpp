@@ -13,7 +13,7 @@ Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 
 // NodewiseRegression
 List NodewiseRegression(Eigen::VectorXd y, Eigen::MatrixXd response, Eigen::MatrixXd covariates, double asparse, NumericVector regmeanPath, int nregmean, NumericVector lambdaPath, int nlambda, double lambdaFactor, int maxit, double tol, bool verbose);
-RcppExport SEXP _cggr_NodewiseRegression(SEXP ySEXP, SEXP responseSEXP, SEXP covariatesSEXP, SEXP asparseSEXP, SEXP regmeanPathSEXP, SEXP nregmeanSEXP, SEXP lambdaPathSEXP, SEXP nlambdaSEXP, SEXP lambdaFactorSEXP, SEXP maxitSEXP, SEXP tolSEXP, SEXP verboseSEXP) {
+RcppExport SEXP _ncagr_NodewiseRegression(SEXP ySEXP, SEXP responseSEXP, SEXP covariatesSEXP, SEXP asparseSEXP, SEXP regmeanPathSEXP, SEXP nregmeanSEXP, SEXP lambdaPathSEXP, SEXP nlambdaSEXP, SEXP lambdaFactorSEXP, SEXP maxitSEXP, SEXP tolSEXP, SEXP verboseSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -35,11 +35,11 @@ END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
-    {"_cggr_NodewiseRegression", (DL_FUNC) &_cggr_NodewiseRegression, 12},
+    {"_ncagr_NodewiseRegression", (DL_FUNC) &_ncagr_NodewiseRegression, 12},
     {NULL, NULL, 0}
 };
 
-RcppExport void R_init_cggr(DllInfo *dll) {
+RcppExport void R_init_ncagr(DllInfo *dll) {
     R_registerRoutines(dll, NULL, CallEntries, NULL, NULL);
     R_useDynamicSymbols(dll, FALSE);
 }
