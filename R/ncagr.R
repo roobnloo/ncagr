@@ -133,35 +133,20 @@ ncagr <- function(responses, covariates, asparse,
   bhat_mx <- matrix(beta[bhat_select], nrow = bveclength, ncol = p)
   bhat_tens <-  array(0, dim = c(p, p, q + 1))
   for (i in seq_len(p)) {
-    bhat_tens[i, -i, ] <- bhat_mx[, i] / varhat[i]
+    bhat_tens[i, -i, ] <- bhat_mx[, i]
   }
 
   bhat_symm <- abind::abind(
     apply(bhat_tens, 3, symmetrize, simplify = FALSE), along = 3)
 
-  # Returns the estimated precision matrix of the ith observation
-  precision <- function(i) {
-    Theta <- apply(bhat_symm, c(1, 2), \(b) b %*% c(1, covariates[i, ]))
-    diag(Theta) <- -1
-    omega <- -1 * diag(1 / varhat) %*% Theta
-    return(omega)
-  }
+  outlist <- list(gamma = ghat_mx,
+                  beta = bhat_symm,
+                  sigma2 = varhat,
+                  lambda = lambdas,
+                  regmean = regmeanpaths,
+                  cv_lambda_idx = cv_lambda_idx,
+                  cv_regmean_idx = cv_regmean_idx)
+  class(outlist) <- "ncagr"
 
-  # Returns the estimated mean vector of the ith observation
-  mean <- function(i) {
-    prec <- precision(i)
-    mu <- solve(prec, diag(1 / varhat) %*% ghat_mx %*% covariates[i, ])
-    return(mu)
-  }
-
-  return(list(ghat = ghat_mx,
-              bhat = bhat_symm,
-              bhat_asym = bhat_tens,
-              varhat = varhat,
-              lambda = lambdas,
-              regmeanpaths = regmeanpaths,
-              cv_lambda_idx = cv_lambda_idx,
-              cv_regmean_idx = cv_regmean_idx,
-              precision = precision,
-              mean = mean))
+  return(outlist)
 }

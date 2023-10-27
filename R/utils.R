@@ -28,13 +28,3 @@ symmetrize <- function(mx, rule = "and") {
   }
   return(result)
 }
-
-compute_residual <- function(y, responses, covariates, gamma_j, beta_j) {
-  # p <- ncol(responses) + 1
-  # wj <- intxmx(responses, covariates)
-  # x_gamma_j <- covariates %*% gamma_j # X gamma_j
-  # y_b_j0 <- responses %*% beta_j[seq_len(p - 1)] # Y_-j b_j^0
-  # wjbetaj0 <- wj %*% beta_j[-seq_len(p - 1)] # W_-j beta_j,-0
-  W <- cbind(responses, intxmx(responses, covariates))
-  return(y - covariates %*% gamma_j - W %*% beta_j)
-}
