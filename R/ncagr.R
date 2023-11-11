@@ -42,8 +42,9 @@ ncagr <- function(responses, covariates, asparse,
   nodewise <- function(node) {
     # if (verbose)
     #   print(paste("Starting initial run for node", node))
+    y <- responses[, node] - mean(responses[, node])
     nodereg <- NodewiseRegression(
-      responses[, node], responses[, -node], covariates, asparse,
+      y, responses[, -node], covariates, asparse,
       nregmean = nregmean, nlambda = nlambda, lambdaFactor = lambdafactor,
       maxit = maxit, tol = tol)
     if (verbose)
@@ -88,10 +89,10 @@ ncagr <- function(responses, covariates, asparse,
   cv_mse <- array(dim = c(p, nlambda, nregmean))
 
   cv_node <- function(node) {
-    cv_result <- cv_ncagr_node(
-      node, responses, covariates, asparse,
-      lambdas[, node], regmeanpaths[, node],
-      maxit, tol, nfolds)
+    y <- responses[, node] - mean(responses[, node])
+    cv_result <- cv_ncagr_node(y, responses[, -node], covariates, asparse,
+                               lambdas[, node], regmeanpaths[, node],
+                               maxit, tol, nfolds)
     if (verbose)
       message("Done cross-validating node ", node)
     return(cv_result)

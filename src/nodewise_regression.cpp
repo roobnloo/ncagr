@@ -8,12 +8,12 @@ using namespace Eigen;
 
 // For easy debugging
 /*
-void print(VectorXd v)
+void pprint(VectorXd v)
 {
     std::cout << v << std::endl;
 }
 
-void print(MatrixXd m, int c)
+void pprint(MatrixXd m, int c)
 {
     std::cout << m.col(c) << std::endl;
 }
@@ -212,17 +212,18 @@ void applySparseGLUpdate(
 double estimateVariance(
     const VectorXd &residual, const VectorXd &gamma, const MatrixXd &beta)
 {
-    // int numNonZero = (beta.array().abs() > 0).count();
-    int nnZeroGroups = 0;
-    for (int i = 1; i < beta.cols(); ++i)
-    {
-        if ((beta.col(i).array().abs() > 0).any())
-        {
-            ++nnZeroGroups;
-        }
-    }
-    int nnZeroPop = (beta.col(0).array().abs() > 0).count();
-    double varhat = residual.squaredNorm() / (residual.rows() - 1 - nnZeroGroups - nnZeroPop);
+    int numNonZero = (beta.array().abs() > 0).count();
+    // int nnZeroGroups = 0;
+    // for (int i = 1; i < beta.cols(); ++i)
+    // {
+    //     if ((beta.col(i).array().abs() > 0).any())
+    //     {
+    //         ++nnZeroGroups;
+    //     }
+    // }
+    // int nnZeroPop = (beta.col(0).array().abs() > 0).count();
+    // double varhat = residual.squaredNorm() / (residual.rows() - 1 - nnZeroGroups - nnZeroPop);
+    double varhat = residual.squaredNorm() / (residual.rows() - numNonZero);
     // std::cout << "varhat: " << varhat << std::endl;
     return varhat;
 }
@@ -255,9 +256,15 @@ NumericVector getRegMeanPathSparse(
     {
         stop("Number of mean penalty terms must be strictly positive!");
     }
+
     NumericVector loglinInterp(nregmean);
-    double delta = log(regmeanFactor) / (nregmean - 1);
     double regmeanMax = (covariates.transpose() * y).lpNorm<Infinity>();
+    if (nregmean == 1) {
+        loglinInterp[0] = regmeanMax;
+        return loglinInterp;
+    }
+
+    double delta = log(regmeanFactor) / (nregmean - 1);
     for (int i = 0; i < nregmean; ++i)
     {
         loglinInterp[i] = regmeanMax * exp(i * delta);

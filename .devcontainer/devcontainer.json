@@ -34,7 +34,8 @@
 				"tomoki1207.pdf",
 				"llvm-vs-code-extensions.vscode-clangd",
 				"GitHub.copilot",
-				"eamodio.gitlens"
+				"eamodio.gitlens",
+				"ms-vscode.cpptools"
 			]
 		}
 	}

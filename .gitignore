@@ -1,3 +1,4 @@
 scratch/
+.vscode/
 *.so
 *.o

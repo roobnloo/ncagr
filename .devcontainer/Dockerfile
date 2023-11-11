@@ -11,7 +11,7 @@ ENV PATH /opt/conda/bin:$PATH
 RUN curl --silent -L --fail \
         https://github.com/quarto-dev/quarto-cli/releases/download/v1.2.269/quarto-1.2.269-linux-amd64.deb > /tmp/quarto.deb && \
     apt update && \
-    apt install -y --no-install-recommends /tmp/quarto.deb tmux clangd
+    apt install -y --no-install-recommends /tmp/quarto.deb tmux clangd gdb
 
 USER rstudio
 
