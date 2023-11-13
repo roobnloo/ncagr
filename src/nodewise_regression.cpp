@@ -90,7 +90,7 @@ void applyL1Update(
 
 double objective(
     const VectorXd &residual, const VectorXd &mean_coef, const MatrixXd &beta,
-    double regmean, double lambda, double asparse)
+    double regmean, double lambda, double asparsefct)
 {
     double quad_loss = residual.squaredNorm() / (2 * residual.rows());
     // double mean_obj = mean_coef.squaredNorm();
@@ -104,33 +104,33 @@ double objective(
     }
     double result = quad_loss +
                     regmean * mean_obj +
-                    asparse * lambda * lasso_obj +
-                    (1 - asparse) * lambda * group_lasso_obj;
+                    lambda * lasso_obj +
+                    asparsefct * lambda * group_lasso_obj;
     return result;
 }
 
 double objective_sgl(
-    const VectorXd &residual, const VectorXd &v, double lambda, double asparse)
+    const VectorXd &residual, const VectorXd &v, double lambda, double asparsefct)
 {
     int n = residual.rows();
     return residual.squaredNorm() / (2 * n) +
-           asparse * lambda * v.lpNorm<1>() +
-           (1 - asparse) * lambda * v.norm();
+           lambda * v.lpNorm<1>() +
+           asparsefct * lambda * v.norm();
 }
 
 // TODO: Is there a way to avoid returning a copy in this function?
 VectorXd sglUpdateStep(
     const VectorXd &center, const VectorXd &grad,
-    double step, double lambda, double asparse)
+    double step, double lambda, double asparsefct)
 {
     VectorXd thresh = softThreshold(
-        center - step * grad, step * asparse * lambda);
+        center - step * grad, step * lambda);
     double threshnorm = thresh.norm();
-    if (threshnorm <= step * (1 - asparse) * lambda)
+    if (threshnorm <= step * asparsefct * lambda)
     {
         return VectorXd::Zero(center.rows());
     }
-    double normterm = 1 - step * (1 - asparse) * lambda / threshnorm;
+    double normterm = 1 - step * asparsefct * lambda / threshnorm;
     if (normterm < 0)
     {
         return VectorXd::Zero(center.rows());
@@ -140,7 +140,7 @@ VectorXd sglUpdateStep(
 
 void applySparseGLUpdate(
     Ref<VectorXd> beta_grp, VectorXd &residual, const MatrixXd &intx,
-    double lambda, double asparse, int maxit, double tol)
+    double lambda, double asparsefct, int maxit, double tol)
 {
     int n = intx.rows();
     if (residual.rows() != n || intx.cols() != beta_grp.rows())
@@ -150,10 +150,10 @@ void applySparseGLUpdate(
 
     residual += intx * beta_grp;
     VectorXd threshold = softThreshold(
-        intx.transpose() * residual / n, asparse * lambda);
+        intx.transpose() * residual / n, lambda);
 
     // If this subgradient condition holds, the entire group should be zero
-    if (threshold.norm() <= (1 - asparse) * lambda)
+    if (threshold.norm() <= asparsefct * lambda)
     {
         beta_grp = VectorXd::Zero(beta_grp.rows());
         return;
@@ -166,7 +166,7 @@ void applySparseGLUpdate(
     for (int i = 0; i < maxit; ++i)
     {
         objnew = objective_sgl(
-            residual - intx * beta_grp, beta_grp, lambda, asparse);
+            residual - intx * beta_grp, beta_grp, lambda, asparsefct);
         if (std::abs(objnew - obj) < tol)
         {
             break;
@@ -189,7 +189,7 @@ void applySparseGLUpdate(
         while (true)
         {
             center_new = sglUpdateStep(
-                beta_grp, grad, step_size, lambda, asparse);
+                beta_grp, grad, step_size, lambda, asparsefct);
             VectorXd centerdiff = center_new - beta_grp;
             rhs = quad_loss_old + grad.dot(centerdiff) +
                   centerdiff.squaredNorm() / (2 * step_size);
@@ -315,7 +315,7 @@ RegressionResult nodewiseRegressionInit(
     const VectorXd &y, const MatrixXd &response, const MatrixXd &covariates,
     const std::vector<MatrixXd> &intxs,
     VectorXd &gamma, MatrixXd &beta, // initial guess
-    double lambda, double asparse, double regmean,
+    double lambda, double asparsefct, double regmean,
     int maxit, double tol, bool verbose)
 {
     int p = response.cols() + 1;
@@ -329,22 +329,22 @@ RegressionResult nodewiseRegressionInit(
     }
 
     NumericVector objval(maxit + 1);
-    objval[0] = objective(residual, gamma, beta, regmean, lambda, asparse);
+    objval[0] = objective(residual, gamma, beta, regmean, lambda, asparsefct);
 
     for (int i = 0; i < maxit; ++i)
     {
         // applyRidgeUpdate(gamma, residual, covariates, regmean);
         applyL1Update(gamma, residual, covariates, regmean);
-        applyL1Update(beta.col(0), residual, response, lambda * asparse);
+        applyL1Update(beta.col(0), residual, response, lambda);
 
         for (int j = 0; j < q; ++j)
         {
             applySparseGLUpdate(
                 beta.col(j + 1), residual, intxs[j],
-                lambda, asparse, maxit, tol);
+                lambda, asparsefct, maxit, tol);
         }
 
-        objval[i + 1] = objective(residual, gamma, beta, regmean, lambda, asparse);
+        objval[i + 1] = objective(residual, gamma, beta, regmean, lambda, asparsefct);
         // if (verbose)
         //     std::cout << "Iteration: " << i << ":: obj:" << objval[i+1] << std::endl;
 
@@ -400,6 +400,7 @@ List NodewiseRegression(
     {
         stop("Maximium iteration and/or numerical tolerance are out of range!");
     }
+    double asparsefct = (1 - asparse) / asparse;
 
     std::vector<MatrixXd> intxs(q);
     for (int i = 0; i < q; ++i)
@@ -433,7 +434,7 @@ List NodewiseRegression(
                 // std::cout << "Regression with lambda index " << lambdaIdx << std::endl;
             regResult = nodewiseRegressionInit(
                 y, response, covariates, intxs, gamma, beta,
-                lambdaPath[lambdaIdx], asparse, regmeanPath[regmeanIdx],
+                lambdaPath[lambdaIdx], asparsefct, regmeanPath[regmeanIdx],
                 maxit, tol, verbose);
 
             // Use gamma and beta as initializers for next lambda (warm-starts)
