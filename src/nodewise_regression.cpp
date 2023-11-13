@@ -311,6 +311,13 @@ struct RegressionResult {
     double objval;
 };
 
+double paramMaxNorm(const VectorXd &gamma, const MatrixXd &beta)
+{
+    double maxNormGamma = gamma.lpNorm<Infinity>();
+    double maxNormBeta = beta.array().abs().maxCoeff();
+    return std::max(maxNormGamma, maxNormBeta);
+}
+
 RegressionResult nodewiseRegressionInit(
     const VectorXd &y, const MatrixXd &response, const MatrixXd &covariates,
     const std::vector<MatrixXd> &intxs,
@@ -330,9 +337,10 @@ RegressionResult nodewiseRegressionInit(
 
     NumericVector objval(maxit + 1);
     objval[0] = objective(residual, gamma, beta, regmean, lambda, asparsefct);
-
+    double maxNorm = paramMaxNorm(gamma, beta);
     for (int i = 0; i < maxit; ++i)
     {
+        double prevMaxNorm = maxNorm;
         // applyRidgeUpdate(gamma, residual, covariates, regmean);
         applyL1Update(gamma, residual, covariates, regmean);
         applyL1Update(beta.col(0), residual, response, lambda);
@@ -345,6 +353,7 @@ RegressionResult nodewiseRegressionInit(
         }
 
         objval[i + 1] = objective(residual, gamma, beta, regmean, lambda, asparsefct);
+        maxNorm = paramMaxNorm(gamma, beta);
         // if (verbose)
         //     std::cout << "Iteration: " << i << ":: obj:" << objval[i+1] << std::endl;
 
@@ -355,7 +364,8 @@ RegressionResult nodewiseRegressionInit(
             stop("Potential oscillation!");
         }
 
-        if (std::abs(objval[i + 1] - objval[i]) < tol)
+        if (abs((objval[i + 1] - objval[i]) / objval[i]) < tol ||
+            abs(maxNorm - prevMaxNorm) < tol)
         {
             objval = objval[Rcpp::Range(0, i + 1)];
             break;
