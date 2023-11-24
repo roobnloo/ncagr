@@ -20,6 +20,6 @@ RUN pip install radian && \
     installGithub.r ManuelHentschel/vscDebugger
 
 
-RUN install2.r RcppEigen abind
+RUN install2.r RcppEigen abind tictoc CVXR
 
 USER root

@@ -119,7 +119,8 @@ double objective_sgl(
 }
 
 // TODO: Is there a way to avoid returning a copy in this function?
-VectorXd sglUpdateStep(
+void sglUpdateStep(
+    VectorXd &center_new,
     const VectorXd &center, const VectorXd &grad,
     double step, double lambda, double asparsefct)
 {
@@ -128,14 +129,16 @@ VectorXd sglUpdateStep(
     double threshnorm = thresh.norm();
     if (threshnorm <= step * asparsefct * lambda)
     {
-        return VectorXd::Zero(center.rows());
+        center_new = VectorXd::Zero(center.rows());
+        return;
     }
     double normterm = 1 - step * asparsefct * lambda / threshnorm;
     if (normterm < 0)
     {
-        return VectorXd::Zero(center.rows());
+        center_new = VectorXd::Zero(center.rows());
+        return;
     }
-    return normterm * thresh;
+    center_new = normterm * thresh;
 }
 
 void applySparseGLUpdate(
@@ -188,8 +191,8 @@ void applySparseGLUpdate(
         double quad_loss_old = (residual - grp_fit).squaredNorm() / (2 * n);
         while (true)
         {
-            center_new = sglUpdateStep(
-                beta_grp, grad, step_size, lambda, asparsefct);
+             sglUpdateStep(
+                center_new, beta_grp, grad, step_size, lambda, asparsefct);
             VectorXd centerdiff = center_new - beta_grp;
             rhs = quad_loss_old + grad.dot(centerdiff) +
                   centerdiff.squaredNorm() / (2 * step_size);
@@ -250,7 +253,7 @@ NumericVector getRegMeanPath(int nregmean, const MatrixXd &covariates)
 
 NumericVector getRegMeanPathSparse(
     int nregmean, const VectorXd &y, const MatrixXd &covariates,
-    double regmeanFactor = 1e-4)
+    double regmeanFactor = 1e-6)
 {
     if (nregmean <= 0)
     {
@@ -328,6 +331,7 @@ RegressionResult nodewiseRegressionInit(
     int p = response.cols() + 1;
     int q = covariates.cols();
     beta.resize(p-1, q+1);
+    // regmean *= sqrt(q); // Adjust for group size
 
     VectorXd residual = y - covariates * gamma - response * beta.col(0);
     for (int i = 0; i < (int) intxs.size(); ++i)
