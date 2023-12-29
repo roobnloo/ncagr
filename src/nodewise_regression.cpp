@@ -90,7 +90,7 @@ void applyL1Update(
 
 double objective(
     const VectorXd &residual, const VectorXd &mean_coef, const MatrixXd &beta,
-    double regmean, double lambda, double asparsefct)
+    double regmean, double lambda, double sglmixfct)
 {
     double quad_loss = residual.squaredNorm() / (2 * residual.rows());
     // double mean_obj = mean_coef.squaredNorm();
@@ -105,34 +105,33 @@ double objective(
     double result = quad_loss +
                     regmean * mean_obj +
                     lambda * lasso_obj +
-                    asparsefct * lambda * group_lasso_obj;
+                    sglmixfct * lambda * group_lasso_obj;
     return result;
 }
 
 double objective_sgl(
-    const VectorXd &residual, const VectorXd &v, double lambda, double asparsefct)
+    const VectorXd &residual, const VectorXd &v, double lambda, double sglmixfct)
 {
     int n = residual.rows();
     return residual.squaredNorm() / (2 * n) +
            lambda * v.lpNorm<1>() +
-           asparsefct * lambda * v.norm();
+           sglmixfct * lambda * v.norm();
 }
 
-// TODO: Is there a way to avoid returning a copy in this function?
 void sglUpdateStep(
     VectorXd &center_new,
     const VectorXd &center, const VectorXd &grad,
-    double step, double lambda, double asparsefct)
+    double step, double lambda, double sglmixfct)
 {
     VectorXd thresh = softThreshold(
         center - step * grad, step * lambda);
     double threshnorm = thresh.norm();
-    if (threshnorm <= step * asparsefct * lambda)
+    if (threshnorm <= step * sglmixfct * lambda)
     {
         center_new = VectorXd::Zero(center.rows());
         return;
     }
-    double normterm = 1 - step * asparsefct * lambda / threshnorm;
+    double normterm = 1 - step * sglmixfct * lambda / threshnorm;
     if (normterm < 0)
     {
         center_new = VectorXd::Zero(center.rows());
@@ -143,7 +142,7 @@ void sglUpdateStep(
 
 void applySparseGLUpdate(
     Ref<VectorXd> beta_grp, VectorXd &residual, const MatrixXd &intx,
-    double lambda, double asparsefct, int maxit, double tol)
+    double lambda, double sglmixfct, int maxit, double tol)
 {
     int n = intx.rows();
     if (residual.rows() != n || intx.cols() != beta_grp.rows())
@@ -156,7 +155,7 @@ void applySparseGLUpdate(
         intx.transpose() * residual / n, lambda);
 
     // If this subgradient condition holds, the entire group should be zero
-    if (threshold.norm() <= asparsefct * lambda)
+    if (threshold.norm() <= sglmixfct * lambda)
     {
         beta_grp = VectorXd::Zero(beta_grp.rows());
         return;
@@ -169,7 +168,7 @@ void applySparseGLUpdate(
     for (int i = 0; i < maxit; ++i)
     {
         objnew = objective_sgl(
-            residual - intx * beta_grp, beta_grp, lambda, asparsefct);
+            residual - intx * beta_grp, beta_grp, lambda, sglmixfct);
         if (std::abs(objnew - obj) < tol)
         {
             break;
@@ -192,7 +191,7 @@ void applySparseGLUpdate(
         while (true)
         {
              sglUpdateStep(
-                center_new, beta_grp, grad, step_size, lambda, asparsefct);
+                center_new, beta_grp, grad, step_size, lambda, sglmixfct);
             VectorXd centerdiff = center_new - beta_grp;
             rhs = quad_loss_old + grad.dot(centerdiff) +
                   centerdiff.squaredNorm() / (2 * step_size);
@@ -231,54 +230,54 @@ double estimateVariance(
     return varhat;
 }
 
-// TODO: This path of regmeans ignores the "beta" part of the residual.
-NumericVector getRegMeanPath(int nregmean, const MatrixXd &covariates)
-{
-    if (nregmean <= 0)
-    {
-        stop("Number of mean penalty terms must be strictly positive!");
-    }
-    JacobiSVD<MatrixXd> svd(covariates);
-    double largestSV = svd.singularValues()[0];
+// // TODO: This path of regmeans ignores the "beta" part of the residual.
+// NumericVector getRegMeanPath(int nregmean, const MatrixXd &covariates)
+// {
+//     if (nregmean <= 0)
+//     {
+//         stop("Number of mean penalty terms must be strictly positive!");
+//     }
+//     JacobiSVD<MatrixXd> svd(covariates);
+//     double largestSV = svd.singularValues()[0];
 
-    NumericVector loglinInterp(nregmean);
-    double regmeanFactor = 1e-3;
-    double delta = log(regmeanFactor) / (nregmean - 1);
-    for (int i = 0; i < nregmean; ++i)
-    {
-        loglinInterp[i] = largestSV * exp(i * delta);
-    }
-    return loglinInterp;
-}
+//     NumericVector loglinInterp(nregmean);
+//     double regmeanFactor = 1e-3;
+//     double delta = log(regmeanFactor) / (nregmean - 1);
+//     for (int i = 0; i < nregmean; ++i)
+//     {
+//         loglinInterp[i] = largestSV * exp(i * delta);
+//     }
+//     return loglinInterp;
+// }
 
-NumericVector getRegMeanPathSparse(
-    int nregmean, const VectorXd &y, const MatrixXd &covariates,
-    double regmeanFactor = 1e-6)
-{
-    if (nregmean <= 0)
-    {
-        stop("Number of mean penalty terms must be strictly positive!");
-    }
+// NumericVector getRegMeanPathSparse(
+//     int nregmean, const VectorXd &y, const MatrixXd &covariates,
+//     double regmeanFactor = 1e-6)
+// {
+//     if (nregmean <= 0)
+//     {
+//         stop("Number of mean penalty terms must be strictly positive!");
+//     }
 
-    NumericVector loglinInterp(nregmean);
-    double regmeanMax = (covariates.transpose() * y).lpNorm<Infinity>();
-    if (nregmean == 1) {
-        loglinInterp[0] = regmeanMax;
-        return loglinInterp;
-    }
+//     NumericVector loglinInterp(nregmean);
+//     double regmeanMax = (covariates.transpose() * y).lpNorm<Infinity>();
+//     if (nregmean == 1) {
+//         loglinInterp[0] = regmeanMax;
+//         return loglinInterp;
+//     }
 
-    double delta = log(regmeanFactor) / (nregmean - 1);
-    for (int i = 0; i < nregmean; ++i)
-    {
-        loglinInterp[i] = regmeanMax * exp(i * delta);
-    }
-    return loglinInterp;
-}
+//     double delta = log(regmeanFactor) / (nregmean - 1);
+//     for (int i = 0; i < nregmean; ++i)
+//     {
+//         loglinInterp[i] = regmeanMax * exp(i * delta);
+//     }
+//     return loglinInterp;
+// }
 
-// TODO: This path of lambdas ignores the "gamma" part of the residual.
 NumericVector getLambdaPath(
     NumericVector inlambda, int nlambda, double lambdaFactor,
-    const VectorXd &y, const std::vector<MatrixXd> &intxs)
+    const VectorXd &y, const MatrixXd &responses, const MatrixXd &covariates,
+    const std::vector<MatrixXd> &intxs)
 {
     if (inlambda.size() > 0)
     {
@@ -289,21 +288,31 @@ NumericVector getLambdaPath(
         }
         return inSorted;
     }
-    double lamdaMax = 0;
+
+    // lambdaMax is the infinity norm of entire design matrix [U, W]
+    double lambdaMax = (covariates.transpose() * y).array().abs().maxCoeff();
+    lambdaMax = std::max(lambdaMax, (responses.transpose() * y).array().abs().maxCoeff());
+
     for (MatrixXd intx : intxs)
     {
         double mc = (intx.transpose() * y).array().abs().maxCoeff();
-        if (mc > lamdaMax)
+        if (mc > lambdaMax)
         {
-            lamdaMax = mc;
+            lambdaMax = mc;
         }
+    }
+
+    if (nlambda <= 1) {
+        NumericVector loglinInterp(1);
+        loglinInterp[0] = lambdaMax;
+        return loglinInterp;
     }
 
     NumericVector loglinInterp(nlambda);
     double delta = log(lambdaFactor) / (nlambda - 1);
     for (int i = 0; i < nlambda; ++i)
     {
-        loglinInterp[i] = lamdaMax * exp(i * delta);
+        loglinInterp[i] = lambdaMax * exp(i * delta);
     }
     return loglinInterp;
 }
@@ -325,7 +334,7 @@ RegressionResult nodewiseRegressionInit(
     const VectorXd &y, const MatrixXd &response, const MatrixXd &covariates,
     const std::vector<MatrixXd> &intxs,
     VectorXd &gamma, MatrixXd &beta, // initial guess
-    double lambda, double asparsefct, double regmean,
+    double lambda, double sglmixfct, double regmean,
     int maxit, double tol, bool verbose)
 {
     int p = response.cols() + 1;
@@ -340,7 +349,7 @@ RegressionResult nodewiseRegressionInit(
     }
 
     NumericVector objval(maxit + 1);
-    objval[0] = objective(residual, gamma, beta, regmean, lambda, asparsefct);
+    objval[0] = objective(residual, gamma, beta, regmean, lambda, sglmixfct);
     double maxNorm = paramMaxNorm(gamma, beta);
     for (int i = 0; i < maxit; ++i)
     {
@@ -353,10 +362,10 @@ RegressionResult nodewiseRegressionInit(
         {
             applySparseGLUpdate(
                 beta.col(j + 1), residual, intxs[j],
-                lambda, asparsefct, maxit, tol);
+                lambda, sglmixfct, maxit, tol);
         }
 
-        objval[i + 1] = objective(residual, gamma, beta, regmean, lambda, asparsefct);
+        objval[i + 1] = objective(residual, gamma, beta, regmean, lambda, sglmixfct);
         maxNorm = paramMaxNorm(gamma, beta);
         // if (verbose)
         //     std::cout << "Iteration: " << i << ":: obj:" << objval[i+1] << std::endl;
@@ -393,11 +402,11 @@ RegressionResult nodewiseRegressionInit(
 
 // [[Rcpp::export]]
 List NodewiseRegression(
-    Eigen::VectorXd y, Eigen::MatrixXd response, Eigen::MatrixXd covariates, double asparse,
-    NumericVector regmeanPath = NumericVector::create(), int nregmean = 10,
+    Eigen::VectorXd y, Eigen::MatrixXd response, Eigen::MatrixXd covariates,
+    NumericVector gmixPath, double sglmix,
     NumericVector lambdaPath = NumericVector::create(),
     int nlambda = 100, double lambdaFactor = 1e-4,
-    int maxit = 1000, double tol = 1e-8, bool verbose = true)
+    int maxit = 1000, double tol = 1e-8, bool verbose = false)
 {
     int p = response.cols() + 1;
     int q = covariates.cols();
@@ -406,15 +415,20 @@ List NodewiseRegression(
     {
         stop("Responses and covariates must have the same number of observations!");
     }
-    if (asparse < 0 || asparse > 1)
+    if (sglmix < 0 || sglmix > 1)
     {
-        stop("Sparsity mixture parameter must be between zero and one!");
+        stop("Sparse group lasso mixture parameter must be between zero and one!");
     }
     if (maxit <= 0 || tol <= 0)
     {
         stop("Maximium iteration and/or numerical tolerance are out of range!");
     }
-    double asparsefct = (1 - asparse) / asparse;
+    int ngmix = gmixPath.size();
+    if (ngmix <= 0)
+    {
+        stop("Must provide at least one gamma mixture term!");
+    }
+    double sglmixfct = (1 - sglmix) / sglmix;
 
     std::vector<MatrixXd> intxs(q);
     for (int i = 0; i < q; ++i)
@@ -424,20 +438,20 @@ List NodewiseRegression(
         intxs[i] = intx;
     }
 
-    if (regmeanPath.size() == 0) // TODO: sort by increasing if nonempty
-        regmeanPath = getRegMeanPathSparse(nregmean, y, covariates);
-    nregmean = regmeanPath.size();
+    // if (regmeanPath.size() == 0) // TODO: sort by increasing if nonempty
+    //     regmeanPath = getRegMeanPathSparse(nregmean, y, covariates);
+    // nregmean = regmeanPath.size();
 
-    lambdaPath = getLambdaPath(lambdaPath, nlambda, lambdaFactor, y, intxs);
+    lambdaPath = getLambdaPath(lambdaPath, nlambda, lambdaFactor, y, response, covariates, intxs);
     nlambda = lambdaPath.size(); // a bit of a hack for user-provided lambdas
 
-    MatrixXd gammaFull(q, nlambda * nregmean);
-    MatrixXd betaFull((p-1)*(q+1), nlambda * nregmean);
-    MatrixXd varhatFull(nlambda, nregmean);
-    MatrixXd residualFull(y.rows(), nlambda * nregmean);
-    MatrixXd objectiveFull(nlambda, nregmean);
+    MatrixXd gammaFull(q, nlambda * ngmix);
+    MatrixXd betaFull((p-1)*(q+1), nlambda * ngmix);
+    MatrixXd varhatFull(nlambda, ngmix);
+    MatrixXd residualFull(y.rows(), nlambda * ngmix);
+    MatrixXd objectiveFull(nlambda, ngmix);
 
-    for (int regmeanIdx = 0; regmeanIdx < nregmean; ++regmeanIdx)
+    for (int gmixIdx = 0; gmixIdx < ngmix; ++gmixIdx)
     {
         RegressionResult regResult;
         MatrixXd beta(MatrixXd::Zero((p-1)*(q+1), 1));
@@ -446,27 +460,31 @@ List NodewiseRegression(
         {
             // if (verbose)
                 // std::cout << "Regression with lambda index " << lambdaIdx << std::endl;
+            double gmix = gmixPath[gmixIdx];
+            double lambda = lambdaPath[lambdaIdx] * (1 - gmix);
+            double regmean = lambdaPath[lambdaIdx] * gmix;
+
             regResult = nodewiseRegressionInit(
                 y, response, covariates, intxs, gamma, beta,
-                lambdaPath[lambdaIdx], asparsefct, regmeanPath[regmeanIdx],
+                lambda, sglmixfct, regmean,
                 maxit, tol, verbose);
 
             // Use gamma and beta as initializers for next lambda (warm-starts)
-            int colIdx = nlambda * regmeanIdx + lambdaIdx;
+            int colIdx = nlambda * gmixIdx + lambdaIdx;
             gammaFull.col(colIdx) = gamma;
             betaFull.col(colIdx) = beta;
             residualFull.col(colIdx) = regResult.resid;
-            varhatFull(lambdaIdx, regmeanIdx) = regResult.varhat;
-            objectiveFull(lambdaIdx, regmeanIdx) = regResult.objval;
+            varhatFull(lambdaIdx, gmixIdx) = regResult.varhat;
+            objectiveFull(lambdaIdx, gmixIdx) = regResult.objval;
         }
     }
 
     NumericVector gamma(wrap(gammaFull));
-    gamma.attr("dim") = NumericVector::create(q, nlambda, nregmean);
+    gamma.attr("dim") = NumericVector::create(q, nlambda, ngmix);
     NumericVector beta(wrap(betaFull));
-    beta.attr("dim") = NumericVector::create((p-1)*(q+1), nlambda, nregmean);
+    beta.attr("dim") = NumericVector::create((p-1)*(q+1), nlambda, ngmix);
     NumericVector resid(wrap(residualFull));
-    resid.attr("dim") = NumericVector::create(y.rows(), nlambda, nregmean);
+    resid.attr("dim") = NumericVector::create(y.rows(), nlambda, ngmix);
 
     return List::create(
         Named("beta") = beta,
@@ -474,6 +492,5 @@ List NodewiseRegression(
         Named("varhat") = varhatFull,
         Named("objval") = objectiveFull,
         Named("resid") = resid,
-        Named("lambdas") = lambdaPath,
-        Named("regmeans") = regmeanPath);
+        Named("lambdapath") = lambdaPath);
 }

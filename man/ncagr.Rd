@@ -7,8 +7,8 @@
 ncagr(
   responses,
   covariates,
-  asparse,
-  nregmean = 10,
+  sglmix = 0.75,
+  gmixpath = seq(0.1, 0.9, by = 0.1),
   nlambda = 100,
   lambdafactor = 1e-04,
   maxit = 3e+06,
@@ -19,21 +19,21 @@ ncagr(
 )
 }
 \arguments{
-\item{responses}{\eqn{n x p} matrix of responses}
+\item{responses}{\eqn{n \times p} matrix of responses}
 
-\item{covariates}{\eqn{n x q} matrix of covariates}
+\item{covariates}{\eqn{n \times q} matrix of covariates}
 
-\item{asparse}{The sparse-group lasso mixing parameter with \eqn{0\leq \alpha \leq 1}}
+\item{sglmix}{The sparse-group lasso mixing parameter with \eqn{0\leq \alpha \leq 1}}
 
-\item{nregmean}{The number of eta values - default is 10}
+\item{gmixpath}{A path of ncagr mixing parameters. Default is 0.1, 0.2, ..., 0.9.}
 
-\item{nlambda}{The number of lambda values - default is 100}
+\item{nlambda}{The number of lambda values to use for cross-validation - default is 100.}
 
 \item{lambdafactor}{The smallest value of lambda as a fraction of the maximum lambda.}
 
-\item{maxit}{The maximum number of iterations. Default is \eqn{3\times 10^6}}
+\item{maxit}{The maximum number of iterations. Default is \eqn{3\times 10^6}.}
 
-\item{tol}{The convergence threshhold for optimization. Default is \eqn{10^{-8}}}
+\item{tol}{The convergence threshhold for optimization. Default is \eqn{10^{-8}}.}
 
 \item{nfolds}{Number of folds for cross-validation. Default is 5.}
 
