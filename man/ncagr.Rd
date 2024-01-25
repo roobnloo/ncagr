@@ -7,14 +7,14 @@
 ncagr(
   responses,
   covariates,
-  sglmix = 0.75,
   gmixpath = seq(0.1, 0.9, by = 0.1),
+  sglmixpath = 0.75,
   nlambda = 100,
   lambdafactor = 1e-04,
   maxit = 3e+06,
-  tol = 1e-08,
+  tol = 1e-06,
   nfolds = 5,
-  verbose = FALSE,
+  verbose = TRUE,
   ncores = 1
 )
 }
@@ -23,9 +23,9 @@ ncagr(
 
 \item{covariates}{\eqn{n \times q} matrix of covariates}
 
-\item{sglmix}{The sparse-group lasso mixing parameter with \eqn{0\leq \alpha \leq 1}}
-
 \item{gmixpath}{A path of ncagr mixing parameters. Default is 0.1, 0.2, ..., 0.9.}
+
+\item{sglmixpath}{A path of sparse-group lasso mixing parameter with \eqn{0\leq \alpha \leq 1}. Default is 0.75.}
 
 \item{nlambda}{The number of lambda values to use for cross-validation - default is 100.}
 
@@ -33,11 +33,11 @@ ncagr(
 
 \item{maxit}{The maximum number of iterations. Default is \eqn{3\times 10^6}.}
 
-\item{tol}{The convergence threshhold for optimization. Default is \eqn{10^{-8}}.}
+\item{tol}{The convergence threshhold for optimization. Default is \eqn{10^{-6}}.}
 
 \item{nfolds}{Number of folds for cross-validation. Default is 5.}
 
-\item{verbose}{If TRUE, prints progress messages. Default is FALSE.}
+\item{verbose}{If TRUE, prints progress messages. Default is TRUE.}
 
 \item{ncores}{Runs the nodewise regressions in parallel using that many cores. Default is 1.}
 }

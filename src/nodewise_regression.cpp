@@ -403,7 +403,7 @@ RegressionResult nodewiseRegressionInit(
 // [[Rcpp::export]]
 List NodewiseRegression(
     Eigen::VectorXd y, Eigen::MatrixXd response, Eigen::MatrixXd covariates,
-    NumericVector gmixPath, double sglmix,
+    NumericVector gmixPath, NumericVector sglmixPath,
     NumericVector lambdaPath = NumericVector::create(),
     int nlambda = 100, double lambdaFactor = 1e-4,
     int maxit = 1000, double tol = 1e-8, bool verbose = false)
@@ -415,9 +415,10 @@ List NodewiseRegression(
     {
         stop("Responses and covariates must have the same number of observations!");
     }
-    if (sglmix < 0 || sglmix > 1)
+    int nsglmix = sglmixPath.size();
+    if (nsglmix == 0)
     {
-        stop("Sparse group lasso mixture parameter must be between zero and one!");
+        stop("Must provide at least one sparse group lasso mixture parameter!");
     }
     if (maxit <= 0 || tol <= 0)
     {
@@ -428,7 +429,20 @@ List NodewiseRegression(
     {
         stop("Must provide at least one gamma mixture term!");
     }
-    double sglmixfct = (1 - sglmix) / sglmix;
+    for (int i = 0; i < ngmix; ++i)
+    {
+        if (gmixPath[i] < 0 || gmixPath[i] > 1)
+        {
+            stop("Gamma mixture terms must be between 0 and 1!");
+        }
+    }
+    for (int i = 0; i < nsglmix; ++i)
+    {
+        if (sglmixPath[i] < 0 || sglmixPath[i] > 1)
+        {
+            stop("Sparse group lasso mixture terms must be between 0 and 1!");
+        }
+    }
 
     std::vector<MatrixXd> intxs(q);
     for (int i = 0; i < q; ++i)
@@ -445,52 +459,63 @@ List NodewiseRegression(
     lambdaPath = getLambdaPath(lambdaPath, nlambda, lambdaFactor, y, response, covariates, intxs);
     nlambda = lambdaPath.size(); // a bit of a hack for user-provided lambdas
 
-    MatrixXd gammaFull(q, nlambda * ngmix);
-    MatrixXd betaFull((p-1)*(q+1), nlambda * ngmix);
-    MatrixXd varhatFull(nlambda, ngmix);
-    MatrixXd residualFull(y.rows(), nlambda * ngmix);
-    MatrixXd objectiveFull(nlambda, ngmix);
+    MatrixXd gammaFull(q, nlambda * nsglmix * ngmix);
+    MatrixXd betaFull((p-1)*(q+1), nlambda * nsglmix * ngmix);
+    MatrixXd varhatFull(nlambda, nsglmix * ngmix);
+    MatrixXd residualFull(y.rows(), nlambda * nsglmix * ngmix);
+    MatrixXd objectiveFull(nlambda, nsglmix * ngmix);
 
     for (int gmixIdx = 0; gmixIdx < ngmix; ++gmixIdx)
     {
-        RegressionResult regResult;
-        MatrixXd beta(MatrixXd::Zero((p-1)*(q+1), 1));
-        VectorXd gamma(VectorXd::Zero(q));
-        for (int lambdaIdx = 0; lambdaIdx < nlambda; ++lambdaIdx)
+        for (int sglmixIdx = 0; sglmixIdx < nsglmix; ++ sglmixIdx)
         {
-            // if (verbose)
-                // std::cout << "Regression with lambda index " << lambdaIdx << std::endl;
-            double gmix = gmixPath[gmixIdx];
-            double lambda = lambdaPath[lambdaIdx] * (1 - gmix);
-            double regmean = lambdaPath[lambdaIdx] * gmix;
+            RegressionResult regResult;
+            MatrixXd beta(MatrixXd::Zero((p-1)*(q+1), 1));
+            VectorXd gamma(VectorXd::Zero(q));
+            for (int lambdaIdx = 0; lambdaIdx < nlambda; ++lambdaIdx)
+            {
+                // if (verbose)
+                    // std::cout << "Regression with lambda index " << lambdaIdx << std::endl;
+                double sglmix = sglmixPath[sglmixIdx];
+                double sglmixfct = (1 - sglmix) / sglmix;
+                double gmix = gmixPath[gmixIdx];
+                double lambda = lambdaPath[lambdaIdx] * (1 - gmix);
+                double regmean = lambdaPath[lambdaIdx] * gmix;
 
-            regResult = nodewiseRegressionInit(
-                y, response, covariates, intxs, gamma, beta,
-                lambda, sglmixfct, regmean,
-                maxit, tol, verbose);
+                regResult = nodewiseRegressionInit(
+                    y, response, covariates, intxs, gamma, beta,
+                    lambda, sglmixfct, regmean,
+                    maxit, tol, verbose);
 
-            // Use gamma and beta as initializers for next lambda (warm-starts)
-            int colIdx = nlambda * gmixIdx + lambdaIdx;
-            gammaFull.col(colIdx) = gamma;
-            betaFull.col(colIdx) = beta;
-            residualFull.col(colIdx) = regResult.resid;
-            varhatFull(lambdaIdx, gmixIdx) = regResult.varhat;
-            objectiveFull(lambdaIdx, gmixIdx) = regResult.objval;
+                // Use gamma and beta as initializers for next lambda (warm-starts)
+                int colIdx = lambdaIdx + nlambda * sglmixIdx  + nlambda * nsglmix * gmixIdx;
+                gammaFull.col(colIdx) = gamma;
+                betaFull.col(colIdx) = beta;
+                residualFull.col(colIdx) = regResult.resid;
+
+                int mixcolIdx = sglmixIdx + nsglmix * gmixIdx;
+                varhatFull(lambdaIdx, mixcolIdx) = regResult.varhat;
+                objectiveFull(lambdaIdx, mixcolIdx) = regResult.objval;
+            }
         }
     }
 
     NumericVector gamma(wrap(gammaFull));
-    gamma.attr("dim") = NumericVector::create(q, nlambda, ngmix);
+    gamma.attr("dim") = NumericVector::create(q, nlambda, nsglmix, ngmix);
     NumericVector beta(wrap(betaFull));
-    beta.attr("dim") = NumericVector::create((p-1)*(q+1), nlambda, ngmix);
+    beta.attr("dim") = NumericVector::create((p-1)*(q+1), nlambda, nsglmix, ngmix);
     NumericVector resid(wrap(residualFull));
-    resid.attr("dim") = NumericVector::create(y.rows(), nlambda, ngmix);
+    resid.attr("dim") = NumericVector::create(y.rows(), nlambda, nsglmix, ngmix);
+    NumericVector varhat(wrap(varhatFull));
+    varhat.attr("dim") = NumericVector::create(nlambda, nsglmix, ngmix);
+    NumericVector objval(wrap(objectiveFull));
+    objval.attr("dim") = NumericVector::create(nlambda, nsglmix, ngmix);
 
     return List::create(
         Named("beta") = beta,
         Named("gamma") = gamma,
-        Named("varhat") = varhatFull,
-        Named("objval") = objectiveFull,
+        Named("varhat") = varhat,
+        Named("objval") = objval,
         Named("resid") = resid,
         Named("lambdapath") = lambdaPath);
 }

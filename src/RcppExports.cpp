@@ -12,8 +12,8 @@ Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 #endif
 
 // NodewiseRegression
-List NodewiseRegression(Eigen::VectorXd y, Eigen::MatrixXd response, Eigen::MatrixXd covariates, NumericVector gmixPath, double sglmix, NumericVector lambdaPath, int nlambda, double lambdaFactor, int maxit, double tol, bool verbose);
-RcppExport SEXP _ncagr_NodewiseRegression(SEXP ySEXP, SEXP responseSEXP, SEXP covariatesSEXP, SEXP gmixPathSEXP, SEXP sglmixSEXP, SEXP lambdaPathSEXP, SEXP nlambdaSEXP, SEXP lambdaFactorSEXP, SEXP maxitSEXP, SEXP tolSEXP, SEXP verboseSEXP) {
+List NodewiseRegression(Eigen::VectorXd y, Eigen::MatrixXd response, Eigen::MatrixXd covariates, NumericVector gmixPath, NumericVector sglmixPath, NumericVector lambdaPath, int nlambda, double lambdaFactor, int maxit, double tol, bool verbose);
+RcppExport SEXP _ncagr_NodewiseRegression(SEXP ySEXP, SEXP responseSEXP, SEXP covariatesSEXP, SEXP gmixPathSEXP, SEXP sglmixPathSEXP, SEXP lambdaPathSEXP, SEXP nlambdaSEXP, SEXP lambdaFactorSEXP, SEXP maxitSEXP, SEXP tolSEXP, SEXP verboseSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -21,14 +21,14 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< Eigen::MatrixXd >::type response(responseSEXP);
     Rcpp::traits::input_parameter< Eigen::MatrixXd >::type covariates(covariatesSEXP);
     Rcpp::traits::input_parameter< NumericVector >::type gmixPath(gmixPathSEXP);
-    Rcpp::traits::input_parameter< double >::type sglmix(sglmixSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type sglmixPath(sglmixPathSEXP);
     Rcpp::traits::input_parameter< NumericVector >::type lambdaPath(lambdaPathSEXP);
     Rcpp::traits::input_parameter< int >::type nlambda(nlambdaSEXP);
     Rcpp::traits::input_parameter< double >::type lambdaFactor(lambdaFactorSEXP);
     Rcpp::traits::input_parameter< int >::type maxit(maxitSEXP);
     Rcpp::traits::input_parameter< double >::type tol(tolSEXP);
     Rcpp::traits::input_parameter< bool >::type verbose(verboseSEXP);
-    rcpp_result_gen = Rcpp::wrap(NodewiseRegression(y, response, covariates, gmixPath, sglmix, lambdaPath, nlambda, lambdaFactor, maxit, tol, verbose));
+    rcpp_result_gen = Rcpp::wrap(NodewiseRegression(y, response, covariates, gmixPath, sglmixPath, lambdaPath, nlambda, lambdaFactor, maxit, tol, verbose));
     return rcpp_result_gen;
 END_RCPP
 }
