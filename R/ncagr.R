@@ -133,7 +133,7 @@ ncagr <- function(responses, covariates, gmixpath = seq(0.1, 0.9, by = 0.1),
   bhat_mx <- matrix(beta[bhat_select], nrow = bveclength, ncol = p)
   bhat_tens <-  array(0, dim = c(p, p, q + 1))
   for (i in seq_len(p)) {
-    bhat_tens[i, -i, ] <- bhat_mx[, i]
+    bhat_tens[i, -i, ] <- -bhat_mx[, i] / varhat[i]
   }
 
   bhat_symm <- abind::abind(

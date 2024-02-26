@@ -210,11 +210,11 @@ void applySparseGLUpdate(
     return;
 }
 
-// TODO: is the variance correct?
+// TODO: we can consider thresholding the number of nonzero entries here.
 double estimateVariance(
     const VectorXd &residual, const VectorXd &gamma, const MatrixXd &beta)
 {
-    int numNonZero = (beta.array().abs() > 0).count();
+    int numNonZero = (beta.array().abs() > 0).count() + (gamma.array().abs() > 0).count();
     // int nnZeroGroups = 0;
     // for (int i = 1; i < beta.cols(); ++i)
     // {
@@ -226,7 +226,6 @@ double estimateVariance(
     // int nnZeroPop = (beta.col(0).array().abs() > 0).count();
     // double varhat = residual.squaredNorm() / (residual.rows() - 1 - nnZeroGroups - nnZeroPop);
     double varhat = residual.squaredNorm() / (residual.rows() - numNonZero);
-    // std::cout << "varhat: " << varhat << std::endl;
     return varhat;
 }
 

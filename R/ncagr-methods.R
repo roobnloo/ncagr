@@ -27,9 +27,8 @@ predict.ncagr <- function(fit, newcovar) {
   dim(newcovar) <- NULL
   if (length(newcovar) != q)
     stop("Expected covariate vector of length ", q, ".")
-  theta <- apply(fit$beta, c(1, 2), \(b) b %*% c(1, newcovar))
-  diag(theta) <- -1
-  omega <- -1 * diag(1 / fit$sigma2) %*% theta
+  omega <- apply(fit$beta, c(1, 2), \(b) b %*% c(1, newcovar))
+  diag(omega) <- 1 / fit$sigma2
 
   mu <- solve(omega, diag(diag(omega)) %*% fit$gamma %*% newcovar)
   return(list(precision = omega, mean = mu))
