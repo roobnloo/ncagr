@@ -35,12 +35,12 @@
 			"settings": {
 				"python.defaultInterpreterPath": "/opt/conda/bin/python",
 				"r.rterm.linux": "/opt/conda/bin/radian",
-				"r.rpath.linux": "/usr/local/bin/R",
+				"r.rpath.linux": "/opt/conda/bin/R",
 				"r.bracketedPaste": true,
 				"r.plot.useHttpgd": true
 			},
 			"extensions": [
-				"reditorsupport.r",
+				"REditorSupport.r",
 				"RDebugger.r-debugger",
 				"quarto.quarto",
 				"tomoki1207.pdf",

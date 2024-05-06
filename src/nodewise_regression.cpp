@@ -278,6 +278,7 @@ NumericVector getLambdaPath(
     const VectorXd &y, const MatrixXd &responses, const MatrixXd &covariates,
     const std::vector<MatrixXd> &intxs)
 {
+    int n = responses.rows();
     if (inlambda.size() > 0)
     {
         NumericVector inSorted = inlambda.sort(true);
@@ -300,6 +301,8 @@ NumericVector getLambdaPath(
             lambdaMax = mc;
         }
     }
+
+    lambdaMax /= n;
 
     if (nlambda <= 1) {
         NumericVector loglinInterp(1);

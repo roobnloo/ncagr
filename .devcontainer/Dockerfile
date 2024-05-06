@@ -1,4 +1,4 @@
-FROM quay.io/jupyter/r-notebook:r-4.3.1
+FROM quay.io/jupyter/r-notebook:r-4.3.3
 
 ### Environment variables
 ENV GITHUB_CLI_VERSION 2.30.0
