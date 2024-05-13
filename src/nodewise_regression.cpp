@@ -1,5 +1,6 @@
 #include <Rcpp.h>
 #include <RcppEigen.h>
+#include <cstdio>
 #include <limits>
 using namespace Rcpp;
 using namespace Eigen;
@@ -278,7 +279,6 @@ NumericVector getLambdaPath(
     const VectorXd &y, const MatrixXd &responses, const MatrixXd &covariates,
     const std::vector<MatrixXd> &intxs)
 {
-    int n = responses.rows();
     if (inlambda.size() > 0)
     {
         NumericVector inSorted = inlambda.sort(true);
@@ -302,7 +302,8 @@ NumericVector getLambdaPath(
         }
     }
 
-    lambdaMax /= n;
+    // int n = responses.rows();
+    // lambdaMax /= (n / 2.0);
 
     if (nlambda <= 1) {
         NumericVector loglinInterp(1);
@@ -404,18 +405,18 @@ RegressionResult nodewiseRegressionInit(
 
 // [[Rcpp::export]]
 List NodewiseRegression(
-    Eigen::VectorXd y, Eigen::MatrixXd response, Eigen::MatrixXd covariates,
+    Eigen::VectorXd y, Eigen::MatrixXd covariates, Eigen::MatrixXd interactions,
     NumericVector gmixPath, NumericVector sglmixPath,
     NumericVector lambdaPath = NumericVector::create(),
     int nlambda = 100, double lambdaFactor = 1e-4,
     int maxit = 1000, double tol = 1e-8, bool verbose = false)
 {
-    int p = response.cols() + 1;
     int q = covariates.cols();
+    int p = interactions.cols() / (q + 1) + 1;
 
-    if (response.rows() != covariates.rows() || y.rows() != response.rows())
+    if (interactions.rows() != covariates.rows() || y.rows() != interactions.rows())
     {
-        stop("Responses and covariates must have the same number of observations!");
+        stop("Covariates and interactions must have the same number of observations!");
     }
     int nsglmix = sglmixPath.size();
     if (nsglmix == 0)
@@ -446,12 +447,11 @@ List NodewiseRegression(
         }
     }
 
+    MatrixXd response = interactions.leftCols(p-1);
     std::vector<MatrixXd> intxs(q);
     for (int i = 0; i < q; ++i)
     {
-        MatrixXd intx =
-            response.array().colwise() * covariates.col(i).array();
-        intxs[i] = intx;
+        intxs[i] = interactions.middleCols((i+1)*(p-1), p-1);
     }
 
     // if (regmeanPath.size() == 0) // TODO: sort by increasing if nonempty

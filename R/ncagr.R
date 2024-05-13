@@ -14,6 +14,8 @@
 #' @useDynLib ncagr
 #' @importFrom Rcpp sourceCpp
 #' @importFrom abind abind
+#' @importFrom Matrix colMeans colSums
+#' @importFrom stats sd
 #' @import parallel
 #' @export
 ncagr <- function(responses, covariates, gmixpath = seq(0.1, 0.9, by = 0.1),
@@ -41,20 +43,28 @@ ncagr <- function(responses, covariates, gmixpath = seq(0.1, 0.9, by = 0.1),
   resid <- array(dim = c(n, nlambda, nsglmix, ngmix, p))
   objval <- array(dim = c(nlambda, nsglmix, ngmix, p))
 
+  cov_sds <- apply(covariates, 2, stats::sd)
+  cov_scale <- scale(covariates)
+  intx <- intxmx(responses, covariates)
+  intx_sds <- apply(intx, 2, sd)
+  intx_scale <- scale(intx)
+
   nodewise <- function(node) {
     # if (verbose)
     #   print(paste("Starting initial run for node", node))
     y <- responses[, node] - mean(responses[, node])
+    intx_scale_node <- intx_scale[, -(seq(0, q) * p + node)]
+
     nodereg <- NodewiseRegression(
-      y, responses[, -node], covariates, gmixpath, sglmixpath,
+      y, cov_scale, intx_scale_node, gmixpath, sglmixpath,
       nlambda = nlambda, lambdaFactor = lambdafactor,
       maxit = maxit, tol = tol)
     if (verbose)
       message("Finished initial run for node ", node)
     return(list(
       lambdas = nodereg["lambdapath"][[1]],
-      beta = nodereg["beta"][[1]],
-      gamma = nodereg["gamma"][[1]],
+      beta = nodereg["beta"][[1]] / intx_sds[-(seq(0, q) * p + node)],
+      gamma = nodereg["gamma"][[1]] / cov_sds,
       varhat = nodereg["varhat"][[1]],
       resid = nodereg["resid"][[1]],
       objval = nodereg["objval"][[1]]
@@ -87,8 +97,7 @@ ncagr <- function(responses, covariates, gmixpath = seq(0.1, 0.9, by = 0.1),
   cv_mse <- array(dim = c(p, nlambda, nsglmix, ngmix))
 
   cv_node <- function(node) {
-    y <- responses[, node] - mean(responses[, node])
-    cv_result <- cv_ncagr_node(y, responses[, -node], covariates, sglmixpath,
+    cv_result <- cv_ncagr_node(responses[, node], responses[, -node], covariates, sglmixpath,
                                lambdas[, node], gmixpath,
                                maxit, tol, nfolds)
     if (verbose)
@@ -147,7 +156,8 @@ ncagr <- function(responses, covariates, gmixpath = seq(0.1, 0.9, by = 0.1),
                   gmixpath = gmixpath,
                   cv_lambda_idx = cv_lambda_idx,
                   cv_sglmix_idx = cv_sglmix_idx,
-                  cv_gmix_idx = cv_gmix_idx)
+                  cv_gmix_idx = cv_gmix_idx,
+                  cv_mse = cv_mse)
   class(outlist) <- "ncagr"
 
   return(outlist)

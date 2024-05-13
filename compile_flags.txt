@@ -1,6 +1,8 @@
 -I
-/usr/local/lib/R/site-library/RcppEigen/include
+/opt/conda/lib/R/library/RcppEigen/include
 -I
-/usr/local/lib/R/site-library/Rcpp/include
+/opt/conda/lib/R/library/RcppEigen/R/RcppEigen/include
 -I
-/usr/local/lib/R/include
+/opt/conda/lib/R/include
+-I
+/opt/conda/lib/R/library/Rcpp/include
