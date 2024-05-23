@@ -91,7 +91,7 @@ void applyL1Update(
 
 double objective(
     const VectorXd &residual, const VectorXd &mean_coef, const MatrixXd &beta,
-    double regmean, double lambda, double sglmixfct)
+    double regmean, double lambda, double sglmix)
 {
     double quad_loss = residual.squaredNorm() / (2 * residual.rows());
     // double mean_obj = mean_coef.squaredNorm();
@@ -105,34 +105,34 @@ double objective(
     }
     double result = quad_loss +
                     regmean * mean_obj +
-                    lambda * lasso_obj +
-                    sglmixfct * lambda * group_lasso_obj;
+                    sglmix * lambda * lasso_obj +
+                    (1 - sglmix) * lambda * group_lasso_obj;
     return result;
 }
 
 double objective_sgl(
-    const VectorXd &residual, const VectorXd &v, double lambda, double sglmixfct)
+    const VectorXd &residual, const VectorXd &v, double lambda, double sglmix)
 {
     int n = residual.rows();
     return residual.squaredNorm() / (2 * n) +
-           lambda * v.lpNorm<1>() +
-           sglmixfct * lambda * v.norm();
+           sglmix * lambda * v.lpNorm<1>() +
+           (1 - sglmix) * lambda * v.norm();
 }
 
 void sglUpdateStep(
     VectorXd &center_new,
     const VectorXd &center, const VectorXd &grad,
-    double step, double lambda, double sglmixfct)
+    double step, double lambda, double sglmix)
 {
     VectorXd thresh = softThreshold(
         center - step * grad, step * lambda);
     double threshnorm = thresh.norm();
-    if (threshnorm <= step * sglmixfct * lambda)
+    if (threshnorm <= step * (1 - sglmix) * lambda)
     {
         center_new = VectorXd::Zero(center.rows());
         return;
     }
-    double normterm = 1 - step * sglmixfct * lambda / threshnorm;
+    double normterm = 1 - step * (1 - sglmix) * lambda / threshnorm;
     if (normterm < 0)
     {
         center_new = VectorXd::Zero(center.rows());
@@ -143,7 +143,7 @@ void sglUpdateStep(
 
 void applySparseGLUpdate(
     Ref<VectorXd> beta_grp, VectorXd &residual, const MatrixXd &intx,
-    double lambda, double sglmixfct, int maxit, double tol)
+    double lambda, double sglmix, int maxit, double tol)
 {
     int n = intx.rows();
     if (residual.rows() != n || intx.cols() != beta_grp.rows())
@@ -156,7 +156,7 @@ void applySparseGLUpdate(
         intx.transpose() * residual / n, lambda);
 
     // If this subgradient condition holds, the entire group should be zero
-    if (threshold.norm() <= sglmixfct * lambda)
+    if (threshold.norm() <= (1 - sglmix) * lambda)
     {
         beta_grp = VectorXd::Zero(beta_grp.rows());
         return;
@@ -169,7 +169,7 @@ void applySparseGLUpdate(
     for (int i = 0; i < maxit; ++i)
     {
         objnew = objective_sgl(
-            residual - intx * beta_grp, beta_grp, lambda, sglmixfct);
+            residual - intx * beta_grp, beta_grp, lambda, sglmix);
         if (std::abs(objnew - obj) < tol)
         {
             break;
@@ -192,7 +192,7 @@ void applySparseGLUpdate(
         while (true)
         {
              sglUpdateStep(
-                center_new, beta_grp, grad, step_size, lambda, sglmixfct);
+                center_new, beta_grp, grad, step_size, lambda, sglmix);
             VectorXd centerdiff = center_new - beta_grp;
             rhs = quad_loss_old + grad.dot(centerdiff) +
                   centerdiff.squaredNorm() / (2 * step_size);
@@ -337,7 +337,7 @@ RegressionResult nodewiseRegressionInit(
     const VectorXd &y, const MatrixXd &response, const MatrixXd &covariates,
     const std::vector<MatrixXd> &intxs,
     VectorXd &gamma, MatrixXd &beta, // initial guess
-    double lambda, double sglmixfct, double regmean,
+    double lambda, double sglmix, double regmean,
     int maxit, double tol, bool verbose)
 {
     int p = response.cols() + 1;
@@ -352,23 +352,23 @@ RegressionResult nodewiseRegressionInit(
     }
 
     NumericVector objval(maxit + 1);
-    objval[0] = objective(residual, gamma, beta, regmean, lambda, sglmixfct);
+    objval[0] = objective(residual, gamma, beta, regmean, lambda, sglmix);
     double maxNorm = paramMaxNorm(gamma, beta);
     for (int i = 0; i < maxit; ++i)
     {
         double prevMaxNorm = maxNorm;
         // applyRidgeUpdate(gamma, residual, covariates, regmean);
         applyL1Update(gamma, residual, covariates, regmean);
-        applyL1Update(beta.col(0), residual, response, lambda);
+        applyL1Update(beta.col(0), residual, response, sglmix * lambda);
 
         for (int j = 0; j < q; ++j)
         {
             applySparseGLUpdate(
                 beta.col(j + 1), residual, intxs[j],
-                lambda, sglmixfct, maxit, tol);
+                lambda, sglmix, maxit, tol);
         }
 
-        objval[i + 1] = objective(residual, gamma, beta, regmean, lambda, sglmixfct);
+        objval[i + 1] = objective(residual, gamma, beta, regmean, lambda, sglmix);
         maxNorm = paramMaxNorm(gamma, beta);
         // if (verbose)
         //     std::cout << "Iteration: " << i << ":: obj:" << objval[i+1] << std::endl;
@@ -479,14 +479,13 @@ List NodewiseRegression(
                 // if (verbose)
                     // std::cout << "Regression with lambda index " << lambdaIdx << std::endl;
                 double sglmix = sglmixPath[sglmixIdx];
-                double sglmixfct = (1 - sglmix) / sglmix;
                 double gmix = gmixPath[gmixIdx];
                 double lambda = lambdaPath[lambdaIdx] * (1 - gmix);
                 double regmean = lambdaPath[lambdaIdx] * gmix;
 
                 regResult = nodewiseRegressionInit(
                     y, response, covariates, intxs, gamma, beta,
-                    lambda, sglmixfct, regmean,
+                    lambda, sglmix, regmean,
                     maxit, tol, verbose);
 
                 // Use gamma and beta as initializers for next lambda (warm-starts)
