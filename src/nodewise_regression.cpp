@@ -343,7 +343,7 @@ RegressionResult nodewiseRegressionInit(
     int p = response.cols() + 1;
     int q = covariates.cols();
     beta.resize(p-1, q+1);
-    // regmean *= sqrt(q); // Adjust for group size
+    regmean *= sqrt(q); // Adjust for group size
 
     VectorXd residual = y - covariates * gamma - response * beta.col(0);
     for (int i = 0; i < (int) intxs.size(); ++i)
