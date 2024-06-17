@@ -52,6 +52,8 @@ RUN mamba install -y -c conda-forge --freeze-installed \
         ### Example (note the backslash after name):        ###
         ### scikit-learn \                                  ###
         #######################################################
+        gmp \
+        mpfr \
         && \
     mamba clean --all
 
@@ -80,7 +82,7 @@ RUN R -q -e 'remotes::install_version("markdown", version="1.12", repos="cloud.r
     ### Example (note the `&& \` after the command):       ###
     ### R -q -e 'install.packages("dplyr")' && \           ###
     ##########################################################
-    R -q -e 'install.packages(c("RcppEigen", "abind"))' && \
+    R -q -e 'install.packages(c("RcppEigen", "abind", "CVXR"))' && \
     echo
 
 ### GitHub CLI Installation
