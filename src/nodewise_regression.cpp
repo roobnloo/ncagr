@@ -329,14 +329,8 @@ nodewiseRegressionInit(const VectorXd &y, const MatrixXd &response,
     objval[i + 1] = objective(residual, gamma, beta, regmean, lambda, sglmix);
     maxNorm = paramMaxNorm(gamma, beta);
     if (verbose)
-      std::cout << "Iteration: " << i << ":: obj:" << objval[i + 1]
-                << std::endl;
-
-    if (i > 4 && std::abs(objval[i + 1] - objval[i - 1]) < 1e-20 &&
-        std::abs(objval[i] - objval[i - 2]) < 1e-20) {
-      // std::cout << "potential oscillation" << std::endl;
-      stop("Potential oscillation!");
-    }
+      Rcpp::Rcout << "Iteration: " << i << ":: obj:" << objval[i + 1]
+                  << std::endl;
 
     if (abs((objval[i + 1] - objval[i]) / objval[i]) < tol ||
         abs(maxNorm - prevMaxNorm) < tol) {
