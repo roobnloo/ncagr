@@ -12,8 +12,8 @@ Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 #endif
 
 // NodewiseRegression
-List NodewiseRegression(Eigen::VectorXd y, Eigen::MatrixXd covariates, Eigen::MatrixXd interactions, NumericVector gmixPath, NumericVector sglmixPath, NumericVector lambdaPath, int nlambda, double lambdaFactor, int maxit, double tol, bool verbose);
-RcppExport SEXP _ncagr_NodewiseRegression(SEXP ySEXP, SEXP covariatesSEXP, SEXP interactionsSEXP, SEXP gmixPathSEXP, SEXP sglmixPathSEXP, SEXP lambdaPathSEXP, SEXP nlambdaSEXP, SEXP lambdaFactorSEXP, SEXP maxitSEXP, SEXP tolSEXP, SEXP verboseSEXP) {
+List NodewiseRegression(Eigen::VectorXd y, Eigen::MatrixXd covariates, Eigen::MatrixXd interactions, NumericVector gmixPath, NumericVector sglmixPath, NumericVector wl1, NumericVector wl2, NumericVector lambdaPath, int nlambda, double lambdaFactor, int maxit, double tol, bool verbose);
+RcppExport SEXP _ncagr_NodewiseRegression(SEXP ySEXP, SEXP covariatesSEXP, SEXP interactionsSEXP, SEXP gmixPathSEXP, SEXP sglmixPathSEXP, SEXP wl1SEXP, SEXP wl2SEXP, SEXP lambdaPathSEXP, SEXP nlambdaSEXP, SEXP lambdaFactorSEXP, SEXP maxitSEXP, SEXP tolSEXP, SEXP verboseSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -22,19 +22,21 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< Eigen::MatrixXd >::type interactions(interactionsSEXP);
     Rcpp::traits::input_parameter< NumericVector >::type gmixPath(gmixPathSEXP);
     Rcpp::traits::input_parameter< NumericVector >::type sglmixPath(sglmixPathSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type wl1(wl1SEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type wl2(wl2SEXP);
     Rcpp::traits::input_parameter< NumericVector >::type lambdaPath(lambdaPathSEXP);
     Rcpp::traits::input_parameter< int >::type nlambda(nlambdaSEXP);
     Rcpp::traits::input_parameter< double >::type lambdaFactor(lambdaFactorSEXP);
     Rcpp::traits::input_parameter< int >::type maxit(maxitSEXP);
     Rcpp::traits::input_parameter< double >::type tol(tolSEXP);
     Rcpp::traits::input_parameter< bool >::type verbose(verboseSEXP);
-    rcpp_result_gen = Rcpp::wrap(NodewiseRegression(y, covariates, interactions, gmixPath, sglmixPath, lambdaPath, nlambda, lambdaFactor, maxit, tol, verbose));
+    rcpp_result_gen = Rcpp::wrap(NodewiseRegression(y, covariates, interactions, gmixPath, sglmixPath, wl1, wl2, lambdaPath, nlambda, lambdaFactor, maxit, tol, verbose));
     return rcpp_result_gen;
 END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
-    {"_ncagr_NodewiseRegression", (DL_FUNC) &_ncagr_NodewiseRegression, 11},
+    {"_ncagr_NodewiseRegression", (DL_FUNC) &_ncagr_NodewiseRegression, 13},
     {NULL, NULL, 0}
 };
 

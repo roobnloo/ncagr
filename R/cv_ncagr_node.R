@@ -1,5 +1,5 @@
 cv_ncagr_node <- function(y, responses, covariates, sglmixpath,
-                          lambdapath, gmixpath,
+                          lambdapath, gmixpath, wl1, wl2,
                           maxit, tol, nfolds,
                           verbose = FALSE) {
   p <- ncol(responses) + 1
@@ -11,7 +11,8 @@ cv_ncagr_node <- function(y, responses, covariates, sglmixpath,
 
   intx <- intxmx(responses, covariates)
   foldsplit <- split(
-    seq_len(n), cut(sample(seq_len(n)), nfolds, labels = FALSE))
+    seq_len(n), cut(sample(seq_len(n)), nfolds, labels = FALSE)
+  )
   mses <- matrix(nrow = nfolds, ncol = nlambda * nsglmix * ngmix)
   for (i in seq_len(nfolds)) {
     testids <- foldsplit[[i]]
@@ -28,7 +29,8 @@ cv_ncagr_node <- function(y, responses, covariates, sglmixpath,
     ntest <- length(testids)
     y_test <- y[testids]
     y_test <- matrix(rep(y_test, times = nlambda * nsglmix * ngmix),
-                     nrow = ntest, ncol = nlambda * nsglmix * ngmix)
+      nrow = ntest, ncol = nlambda * nsglmix * ngmix
+    )
     covariates_test <- covariates[testids, ]
     intx_test <- intx[testids, ]
 
@@ -36,8 +38,9 @@ cv_ncagr_node <- function(y, responses, covariates, sglmixpath,
     covariates_train <- scale(covariates_train)
     intx_train <- scale(intx_train)
     nodereg <- NodewiseRegression(
-      y_train, covariates_train, intx_train, gmixpath, sglmixpath,
-      lambdaPath = lambdapath, maxit = maxit, tol = tol)
+      y_train, covariates_train, intx_train, gmixpath, sglmixpath, wl1, wl2,
+      lambdaPath = lambdapath, maxit = maxit, tol = tol
+    )
 
     gamma <- nodereg["gamma"][[1]]
     dim(gamma) <- c(q, nlambda * nsglmix * ngmix)
@@ -56,8 +59,9 @@ cv_ncagr_node <- function(y, responses, covariates, sglmixpath,
     # resid_test <- sweep(resid_test, 2, Matrix::colSums(gamma * cov_means), "-")
     # resid_test <- sweep(resid_test, 2, Matrix::colSums(beta * intx_means), "-")
     mses[i, ] <- apply(resid_test, 2, \(x) mean(sum(x^2)) / ntest)
-    if (verbose)
+    if (verbose) {
       message("Finished CV fold ", i)
+    }
   }
 
   dim(mses) <- c(nfolds, nlambda, nsglmix, ngmix)

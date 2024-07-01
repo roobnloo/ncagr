@@ -1,6 +1,7 @@
 #include <Rcpp.h>
 #include <RcppEigen.h>
 #include <cstdio>
+#include <iomanip>
 #include <limits>
 using namespace Rcpp;
 using namespace Eigen;
@@ -34,60 +35,77 @@ double softThreshold(double x, double lambda) {
   return signx * diff;
 }
 
-VectorXd softThreshold(const VectorXd &x, double lambda) {
+VectorXd softThreshold(const VectorXd &x, double lambda,
+                       const NumericVector &w) {
+  if (x.rows() != w.size()) {
+    stop("Dimension mismatch during soft thresholding!");
+  }
   VectorXd thresh(x.rows());
   for (int i = 0; i < x.rows(); ++i) {
-    thresh(i) = softThreshold(x(i), lambda);
+    thresh(i) = softThreshold(x(i), lambda * w[i]);
   }
   return thresh;
 }
 
-void applyRidgeUpdate(VectorXd &v, VectorXd &residual, const MatrixXd &U,
-                      double regmean) {
-  if (U.cols() != v.rows()) {
-    stop("Dimension mismatch during ridge update step!");
-  }
+// void applyRidgeUpdate(VectorXd &v, VectorXd &residual, const MatrixXd &U,
+//                       double regmean) {
+//   if (U.cols() != v.rows()) {
+//     stop("Dimension mismatch during ridge update step!");
+//   }
 
-  int p = U.rows();
-  residual += U * v;
-  auto regdiag = VectorXd::Constant(p, 2 * regmean).asDiagonal();
-  MatrixXd UtUreg = U.transpose() * U / residual.rows();
-  UtUreg += regdiag;
-  v = UtUreg.llt().solve(U.transpose() * residual) / residual.rows();
-  residual -= U * v;
-  return;
-}
+//   int p = U.rows();
+//   residual += U * v;
+//   auto regdiag = VectorXd::Constant(p, 2 * regmean).asDiagonal();
+//   MatrixXd UtUreg = U.transpose() * U / residual.rows();
+//   UtUreg += regdiag;
+//   v = UtUreg.llt().solve(U.transpose() * residual) / residual.rows();
+//   residual -= U * v;
+//   return;
+// }
 
 void applyL1Update(Ref<VectorXd> b, VectorXd &residual, const MatrixXd &X,
-                   double penalty) {
+                   double penalty, const NumericVector &wl1) {
   int n = X.rows();
   int p = b.rows();
 
   if (residual.rows() != n || X.cols() != p) {
     stop("Dimension mismatch during L1 update step!");
   }
+  if (wl1.length() != p) {
+    stop("Number of weights does not match number of coefficients in L1 update "
+         "step!");
+  }
 
-  for (int i = 0; i < b.rows(); ++i) {
+  for (int i = 0; i < p; ++i) {
     auto xslice = X.col(i);
     residual += b(i) * xslice;
     double xscale = xslice.squaredNorm() / n;
-    b(i) = softThreshold(residual.dot(xslice) / n, penalty) / xscale;
+    b(i) = softThreshold(residual.dot(xslice) / n, penalty * wl1[i]) / xscale;
     residual -= b(i) * xslice;
   }
   return;
 }
 
-double objective(const VectorXd &residual, const VectorXd &mean_coef,
+double objective(const VectorXd &residual, const VectorXd &gamma,
                  const MatrixXd &beta, double regmean, double lambda,
-                 double sglmix) {
+                 double sglmix, const NumericVector &wl1,
+                 const NumericVector &wl2) {
   double quad_loss = residual.squaredNorm() / (2 * residual.rows());
   // double mean_obj = mean_coef.squaredNorm();
-  double mean_obj = mean_coef.lpNorm<1>();
-  double lasso_obj = beta.col(0).lpNorm<1>();
+  double mean_obj = 0;
+  for (int i = 0; i < gamma.size(); ++i) {
+    mean_obj += std::abs(gamma(i)) * wl1[i];
+  }
+  double lasso_obj = 0;
+  int weight_index = gamma.size();
+  for (int j = 0; j < beta.cols(); ++j) {
+    for (int i = 0; i < beta.rows(); ++i) {
+      lasso_obj += std::abs(beta(i, j)) * wl1[weight_index++];
+    }
+  }
   double group_lasso_obj = 0;
   for (int i = 1; i < beta.cols(); ++i) {
-    lasso_obj += beta.col(i).lpNorm<1>();
-    group_lasso_obj += beta.col(i).norm();
+    group_lasso_obj += wl2[i - 1] * beta.col(i).norm();
   }
   double result = quad_loss + regmean * mean_obj + sglmix * lambda * lasso_obj +
                   (1 - sglmix) * lambda * group_lasso_obj;
@@ -95,22 +113,27 @@ double objective(const VectorXd &residual, const VectorXd &mean_coef,
 }
 
 double objective_sgl(const VectorXd &residual, const VectorXd &v, double lambda,
-                     double sglmix) {
+                     double sglmix, const NumericVector &wl1, double wl2) {
+  if (wl1.size() != v.rows()) {
+    stop("Number of weights does not match number of coefficients in SGL "
+         "objective calculation!");
+  }
   int n = residual.rows();
-  return residual.squaredNorm() / (2 * n) + sglmix * lambda * v.lpNorm<1>() +
-         (1 - sglmix) * lambda * v.norm();
+  double obj = residual.squaredNorm() / (2 * n);
+  for (int i = 0; i < v.rows(); ++i) {
+    obj += sglmix * lambda * std::abs(v(i)) * wl1[i];
+  }
+  obj += (1 - sglmix) * lambda * v.norm() * wl2;
+  return obj;
 }
 
 void sglUpdateStep(VectorXd &center_new, const VectorXd &center,
                    const VectorXd &grad, double step, double lambda,
-                   double sglmix) {
-  VectorXd thresh = softThreshold(center - step * grad, step * sglmix * lambda);
+                   double sglmix, const NumericVector &wl1, double wl2) {
+  VectorXd thresh =
+      softThreshold(center - step * grad, step * sglmix * lambda, wl1);
   double threshnorm = thresh.norm();
-  if (threshnorm <= step * (1 - sglmix) * lambda) {
-    center_new = VectorXd::Zero(center.rows());
-    return;
-  }
-  double normterm = 1 - step * (1 - sglmix) * lambda / threshnorm;
+  double normterm = 1 - step * (1 - sglmix) * lambda * wl2 / threshnorm;
   if (normterm < 0) {
     center_new = VectorXd::Zero(center.rows());
     return;
@@ -120,17 +143,19 @@ void sglUpdateStep(VectorXd &center_new, const VectorXd &center,
 
 void applySparseGLUpdate(Ref<VectorXd> beta_grp, VectorXd &residual,
                          const MatrixXd &intx, double lambda, double sglmix,
-                         int maxit, double tol) {
+                         const NumericVector &wl1, double wl2, int maxit,
+                         double tol) {
   int n = intx.rows();
   if (residual.rows() != n || intx.cols() != beta_grp.rows()) {
     stop("Dimension mismatch during sparse group lasso update step!");
   }
 
   residual += intx * beta_grp;
-  VectorXd threshold = softThreshold(intx.transpose() * residual / n, lambda);
+  VectorXd threshold =
+      softThreshold(intx.transpose() * residual / n, sglmix * lambda, wl1);
 
   // If this subgradient condition holds, the entire group should be zero
-  if (threshold.norm() <= (1 - sglmix) * lambda) {
+  if (threshold.norm() <= (1 - sglmix) * lambda * wl2) {
     beta_grp = VectorXd::Zero(beta_grp.rows());
     return;
   }
@@ -140,8 +165,8 @@ void applySparseGLUpdate(Ref<VectorXd> beta_grp, VectorXd &residual,
   double obj = INFINITY;
   double objnew;
   for (int i = 0; i < maxit; ++i) {
-    objnew =
-        objective_sgl(residual - intx * beta_grp, beta_grp, lambda, sglmix);
+    objnew = objective_sgl(residual - intx * beta_grp, beta_grp, lambda, sglmix,
+                           wl1, wl2);
     if (std::abs(objnew - obj) < tol) {
       break;
     }
@@ -159,7 +184,8 @@ void applySparseGLUpdate(Ref<VectorXd> beta_grp, VectorXd &residual,
     double rhs = 0;
     double quad_loss_old = (residual - grp_fit).squaredNorm() / (2 * n);
     while (true) {
-      sglUpdateStep(center_new, beta_grp, grad, step_size, lambda, sglmix);
+      sglUpdateStep(center_new, beta_grp, grad, step_size, lambda, sglmix, wl1,
+                    wl2);
       VectorXd centerdiff = center_new - beta_grp;
       rhs = quad_loss_old + grad.dot(centerdiff) +
             centerdiff.squaredNorm() / (2 * step_size);
@@ -197,50 +223,6 @@ double estimateVariance(const VectorXd &residual, const VectorXd &gamma,
   return varhat;
 }
 
-// // TODO: This path of regmeans ignores the "beta" part of the residual.
-// NumericVector getRegMeanPath(int nregmean, const MatrixXd &covariates)
-// {
-//     if (nregmean <= 0)
-//     {
-//         stop("Number of mean penalty terms must be strictly positive!");
-//     }
-//     JacobiSVD<MatrixXd> svd(covariates);
-//     double largestSV = svd.singularValues()[0];
-
-//     NumericVector loglinInterp(nregmean);
-//     double regmeanFactor = 1e-3;
-//     double delta = log(regmeanFactor) / (nregmean - 1);
-//     for (int i = 0; i < nregmean; ++i)
-//     {
-//         loglinInterp[i] = largestSV * exp(i * delta);
-//     }
-//     return loglinInterp;
-// }
-
-// NumericVector getRegMeanPathSparse(
-//     int nregmean, const VectorXd &y, const MatrixXd &covariates,
-//     double regmeanFactor = 1e-6)
-// {
-//     if (nregmean <= 0)
-//     {
-//         stop("Number of mean penalty terms must be strictly positive!");
-//     }
-
-//     NumericVector loglinInterp(nregmean);
-//     double regmeanMax = (covariates.transpose() * y).lpNorm<Infinity>();
-//     if (nregmean == 1) {
-//         loglinInterp[0] = regmeanMax;
-//         return loglinInterp;
-//     }
-
-//     double delta = log(regmeanFactor) / (nregmean - 1);
-//     for (int i = 0; i < nregmean; ++i)
-//     {
-//         loglinInterp[i] = regmeanMax * exp(i * delta);
-//     }
-//     return loglinInterp;
-// }
-
 NumericVector getLambdaPath(NumericVector inlambda, int nlambda,
                             double lambdaFactor, const VectorXd &y,
                             const MatrixXd &responses,
@@ -265,9 +247,6 @@ NumericVector getLambdaPath(NumericVector inlambda, int nlambda,
       lambdaMax = mc;
     }
   }
-
-  // int n = responses.rows();
-  // lambdaMax /= (n / 2.0);
 
   if (nlambda <= 1) {
     NumericVector loglinInterp(1);
@@ -295,13 +274,12 @@ double paramMaxNorm(const VectorXd &gamma, const MatrixXd &beta) {
   return std::max(maxNormGamma, maxNormBeta);
 }
 
-RegressionResult
-nodewiseRegressionInit(const VectorXd &y, const MatrixXd &response,
-                       const MatrixXd &covariates,
-                       const std::vector<MatrixXd> &intxs, VectorXd &gamma,
-                       MatrixXd &beta, // initial guess
-                       double lambda, double sglmix, double regmean, int maxit,
-                       double tol, bool verbose) {
+RegressionResult nodewiseRegressionInit(
+    const VectorXd &y, const MatrixXd &response, const MatrixXd &covariates,
+    const std::vector<MatrixXd> &intxs, VectorXd &gamma,
+    MatrixXd &beta, // initial guesses
+    double lambda, double sglmix, double regmean, const NumericVector &wl1,
+    const NumericVector &wl2, int maxit, double tol, bool verbose) {
   int p = response.cols() + 1;
   int q = covariates.cols();
   beta.resize(p - 1, q + 1);
@@ -311,26 +289,32 @@ nodewiseRegressionInit(const VectorXd &y, const MatrixXd &response,
   for (int i = 0; i < (int)intxs.size(); ++i) {
     residual -= intxs[i] * beta.col(i + 1);
   }
-
+  NumericVector gamma_l1_weights = wl1[Rcpp::Range(0, q - 1)];
+  NumericVector beta0_l1_weights = wl1[Rcpp::Range(q, q + p - 2)];
   NumericVector objval(maxit + 1);
-  objval[0] = objective(residual, gamma, beta, regmean, lambda, sglmix);
+  objval[0] =
+      objective(residual, gamma, beta, regmean, lambda, sglmix, wl1, wl2);
   double maxNorm = paramMaxNorm(gamma, beta);
   for (int i = 0; i < maxit; ++i) {
     double prevMaxNorm = maxNorm;
     // applyRidgeUpdate(gamma, residual, covariates, regmean);
-    applyL1Update(gamma, residual, covariates, regmean);
-    applyL1Update(beta.col(0), residual, response, sglmix * lambda);
+    applyL1Update(gamma, residual, covariates, regmean, gamma_l1_weights);
+    applyL1Update(beta.col(0), residual, response, sglmix * lambda,
+                  beta0_l1_weights);
 
     for (int j = 0; j < q; ++j) {
-      applySparseGLUpdate(beta.col(j + 1), residual, intxs[j], lambda, sglmix,
-                          maxit, tol);
+      applySparseGLUpdate(
+          beta.col(j + 1), residual, intxs[j], lambda, sglmix,
+          wl1[Rcpp::Range(q + (j + 1) * (p - 1), q + (j + 2) * (p - 1) - 1)],
+          wl2[j], maxit, tol);
     }
 
-    objval[i + 1] = objective(residual, gamma, beta, regmean, lambda, sglmix);
+    objval[i + 1] =
+        objective(residual, gamma, beta, regmean, lambda, sglmix, wl1, wl2);
     maxNorm = paramMaxNorm(gamma, beta);
     if (verbose)
-      Rcpp::Rcout << "Iteration: " << i << ":: obj:" << objval[i + 1]
-                  << std::endl;
+      Rcpp::Rcout << "Iteration: " << i << ":: obj: " << std::setprecision(20)
+                  << objval[i + 1] << std::endl;
 
     if (abs((objval[i + 1] - objval[i]) / objval[i]) < tol ||
         abs(maxNorm - prevMaxNorm) < tol) {
@@ -342,7 +326,6 @@ nodewiseRegressionInit(const VectorXd &y, const MatrixXd &response,
   //     std::cout << "Finished in " << objval.length() << " iterations" <<
   //     std::endl;
   if (objval.length() == maxit + 1) {
-    // std::cout << "Maximum iterations exceeded!" << std::endl;
     warning("Maximum iterations exceeded!");
   }
 
@@ -355,7 +338,8 @@ nodewiseRegressionInit(const VectorXd &y, const MatrixXd &response,
 // [[Rcpp::export]]
 List NodewiseRegression(Eigen::VectorXd y, Eigen::MatrixXd covariates,
                         Eigen::MatrixXd interactions, NumericVector gmixPath,
-                        NumericVector sglmixPath,
+                        NumericVector sglmixPath, NumericVector wl1,
+                        NumericVector wl2,
                         NumericVector lambdaPath = NumericVector::create(),
                         int nlambda = 100, double lambdaFactor = 1e-4,
                         int maxit = 1000, double tol = 1e-8,
@@ -389,16 +373,18 @@ List NodewiseRegression(Eigen::VectorXd y, Eigen::MatrixXd covariates,
       stop("Sparse group lasso mixture terms must be between 0 and 1!");
     }
   }
+  if (wl1.size() != q + (q + 1) * (p - 1)) {
+    stop("Number of L1 weights must match number of coefficients!");
+  }
+  if (wl2.size() != q) {
+    stop("Number of L2 weights must match number of groups!");
+  }
 
   MatrixXd response = interactions.leftCols(p - 1);
   std::vector<MatrixXd> intxs(q);
   for (int i = 0; i < q; ++i) {
     intxs[i] = interactions.middleCols((i + 1) * (p - 1), p - 1);
   }
-
-  // if (regmeanPath.size() == 0) // TODO: sort by increasing if nonempty
-  //     regmeanPath = getRegMeanPathSparse(nregmean, y, covariates);
-  // nregmean = regmeanPath.size();
 
   lambdaPath = getLambdaPath(lambdaPath, nlambda, lambdaFactor, y, response,
                              covariates, intxs);
@@ -416,9 +402,6 @@ List NodewiseRegression(Eigen::VectorXd y, Eigen::MatrixXd covariates,
       MatrixXd beta(MatrixXd::Zero((p - 1) * (q + 1), 1));
       VectorXd gamma(VectorXd::Zero(q));
       for (int lambdaIdx = 0; lambdaIdx < nlambda; ++lambdaIdx) {
-        // if (verbose)
-        // std::cout << "Regression with lambda index " << lambdaIdx <<
-        // std::endl;
         double sglmix = sglmixPath[sglmixIdx];
         double gmix = gmixPath[gmixIdx];
         double lambda = lambdaPath[lambdaIdx] * (1 - gmix);
@@ -426,7 +409,7 @@ List NodewiseRegression(Eigen::VectorXd y, Eigen::MatrixXd covariates,
 
         regResult = nodewiseRegressionInit(y, response, covariates, intxs,
                                            gamma, beta, lambda, sglmix, regmean,
-                                           maxit, tol, verbose);
+                                           wl1, wl2, maxit, tol, verbose);
 
         // Use gamma and beta as initializers for next lambda (warm-starts)
         int colIdx =

@@ -7,7 +7,7 @@ Author: Robin Liu
 Maintainer: Robin Liu <r_liu@pstat.ucsb.edu>
 Description: Estimates the covariate-dependent graphical model using neighborhood selection.
 License: MIT + file LICENSE
-Imports: Rcpp (>= 1.0.10), abind, Matrix
+Imports: Rcpp (>= 1.0.10), abind, Matrix, glmnet
 LinkingTo: Rcpp, RcppEigen
 RoxygenNote: 7.3.1
 Encoding: UTF-8

@@ -7,15 +7,16 @@
 ncagr(
   responses,
   covariates,
-  gmixpath = seq(0.1, 0.9, by = 0.1),
+  gmixpath = seq(0, 1, by = 0.1),
   sglmixpath = 0.75,
   nlambda = 100,
-  lambdafactor = 1e-04,
+  lambdafactor = 1e-08,
   maxit = 3e+06,
   tol = 1e-06,
   nfolds = 5,
   verbose = TRUE,
-  ncores = 1
+  ncores = 1,
+  adaptive = TRUE
 )
 }
 \arguments{
@@ -40,6 +41,8 @@ ncagr(
 \item{verbose}{If TRUE, prints progress messages. Default is TRUE.}
 
 \item{ncores}{Runs the nodewise regressions in parallel using that many cores. Default is 1.}
+
+\item{adaptive}{Use adaptive weights when fitting nodewise regressions. Default is TRUE.}
 }
 \description{
 Run Natural Covariate-adjusted Graphical Regression

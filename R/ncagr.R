@@ -11,6 +11,7 @@
 #' @param nfolds Number of folds for cross-validation. Default is 5.
 #' @param verbose If TRUE, prints progress messages. Default is TRUE.
 #' @param ncores Runs the nodewise regressions in parallel using that many cores. Default is 1.
+#' @param adaptive Use adaptive weights when fitting nodewise regressions. Default is TRUE.
 #' @useDynLib ncagr
 #' @importFrom Rcpp sourceCpp
 #' @importFrom abind abind
@@ -18,15 +19,16 @@
 #' @importFrom stats sd
 #' @import parallel
 #' @export
-ncagr <- function(responses, covariates, gmixpath = seq(0.1, 0.9, by = 0.1),
+ncagr <- function(responses, covariates, gmixpath = seq(0, 1, by = 0.1),
                   sglmixpath = 0.75, nlambda = 100,
-                  lambdafactor = 1e-4, maxit = 3e6, tol = 1e-6, nfolds = 5,
-                  verbose = TRUE, ncores = 1) {
-
-  stopifnot(is.matrix(responses), is.matrix(covariates),
-            nrow(responses) == nrow(covariates),
-            all(gmixpath >= 0), all(gmixpath <= 1),
-            all(sglmixpath >= 0), all(sglmixpath <= 1))
+                  lambdafactor = 1e-8, maxit = 3e6, tol = 1e-6, nfolds = 5,
+                  verbose = TRUE, ncores = 1, adaptive = TRUE) {
+  stopifnot(
+    is.matrix(responses), is.matrix(covariates),
+    nrow(responses) == nrow(covariates),
+    all(gmixpath >= 0), all(gmixpath <= 1),
+    all(sglmixpath >= 0), all(sglmixpath <= 1)
+  )
 
   p <- ncol(responses)
   q <- ncol(covariates)
@@ -42,6 +44,8 @@ ncagr <- function(responses, covariates, gmixpath = seq(0.1, 0.9, by = 0.1),
   varhat <- array(dim = c(nlambda, nsglmix, ngmix, p))
   resid <- array(dim = c(n, nlambda, nsglmix, ngmix, p))
   objval <- array(dim = c(nlambda, nsglmix, ngmix, p))
+  l1_weights <- matrix(nrow = q + bveclength, ncol = p)
+  l2_weights <- matrix(nrow = q, ncol = p)
 
   cov_sds <- apply(covariates, 2, stats::sd)
   cov_scale <- scale(covariates)
@@ -55,19 +59,39 @@ ncagr <- function(responses, covariates, gmixpath = seq(0.1, 0.9, by = 0.1),
     y <- responses[, node] - mean(responses[, node])
     intx_scale_node <- intx_scale[, -(seq(0, q) * p + node)]
 
+    wl1 <- rep(1, q + bveclength)
+    wl2 <- rep(1, q)
+    if (adaptive) {
+      fit_ridge <- glmnet::glmnet(cbind(cov_scale, intx_scale_node), y, alpha = 0, standardize = FALSE, intercept = FALSE)
+      co <- stats::coef(fit_ridge, s = fit_ridge$lambda[100], exact = TRUE)@x
+      wl1 <- 1 / abs(co)
+      wl1[wl1 > 2000] <- 2000
+      # indices of U, X, without interactions
+      ux_id <- 1:(q + p - 1)
+      wgroups <- co[-ux_id]
+      # Compute weights for each group
+      wl2 <- 1 / sapply(split(wgroups, rep(seq_len(q), each = p - 1)), \(x) sqrt(sum(x^2)))
+      wl2[wl2 > 2000] <- 2000
+    }
+
     nodereg <- NodewiseRegression(
       y, cov_scale, intx_scale_node, gmixpath, sglmixpath,
+      wl1 = wl1, wl2 = wl2,
       nlambda = nlambda, lambdaFactor = lambdafactor,
-      maxit = maxit, tol = tol)
-    if (verbose)
+      maxit = maxit, tol = tol
+    )
+    if (verbose) {
       message("Finished initial run for node ", node)
+    }
     return(list(
       lambdas = nodereg["lambdapath"][[1]],
       beta = nodereg["beta"][[1]] / intx_sds[-(seq(0, q) * p + node)],
       gamma = nodereg["gamma"][[1]] / cov_sds,
       varhat = nodereg["varhat"][[1]],
       resid = nodereg["resid"][[1]],
-      objval = nodereg["objval"][[1]]
+      objval = nodereg["objval"][[1]],
+      wl1 = wl1,
+      wl2 = wl2
     ))
   }
 
@@ -86,6 +110,8 @@ ncagr <- function(responses, covariates, gmixpath = seq(0.1, 0.9, by = 0.1),
     varhat[, , , node] <- reg_result[[node]]$varhat
     resid[, , , , node] <- reg_result[[node]]$resid
     objval[, , , node] <- reg_result[[node]]$objval
+    l1_weights[, node] <- reg_result[[node]]$wl1
+    l2_weights[, node] <- reg_result[[node]]$wl2
   }
 
   message("Finished initial run")
@@ -97,11 +123,14 @@ ncagr <- function(responses, covariates, gmixpath = seq(0.1, 0.9, by = 0.1),
   cv_mse <- array(dim = c(p, nlambda, nsglmix, ngmix))
 
   cv_node <- function(node) {
-    cv_result <- cv_ncagr_node(responses[, node], responses[, -node], covariates, sglmixpath,
-                               lambdas[, node], gmixpath,
-                               maxit, tol, nfolds)
-    if (verbose)
+    cv_result <- cv_ncagr_node(
+      responses[, node], responses[, -node], covariates, sglmixpath,
+      lambdas[, node], gmixpath, l1_weights[, node], l2_weights[, node],
+      maxit, tol, nfolds
+    )
+    if (verbose) {
       message("Done cross-validating node ", node)
+    }
     return(cv_result)
   }
 
@@ -125,39 +154,47 @@ ncagr <- function(responses, covariates, gmixpath = seq(0.1, 0.9, by = 0.1),
 
   message("Finished cross validating all nodes")
 
-  ghat_select <- cbind(rep(seq(q), times = p),
-                       rep(cv_lambda_idx, each = q),
-                       rep(cv_sglmix_idx, each = q),
-                       rep(cv_gmix_idx, each = q),
-                       rep(seq(p), each = q))
+  ghat_select <- cbind(
+    rep(seq(q), times = p),
+    rep(cv_lambda_idx, each = q),
+    rep(cv_sglmix_idx, each = q),
+    rep(cv_gmix_idx, each = q),
+    rep(seq(p), each = q)
+  )
   ghat_mx <- t(matrix(gamma[ghat_select], nrow = q, ncol = p))
 
   varhat <- varhat[cbind(cv_lambda_idx, cv_sglmix_idx, cv_gmix_idx, seq(p))]
 
-  bhat_select <- cbind(rep(seq(bveclength), times = p),
-                       rep(cv_lambda_idx, each = bveclength),
-                       rep(cv_sglmix_idx, each = bveclength),
-                       rep(cv_gmix_idx, each = bveclength),
-                       rep(seq(p), each = bveclength))
+  bhat_select <- cbind(
+    rep(seq(bveclength), times = p),
+    rep(cv_lambda_idx, each = bveclength),
+    rep(cv_sglmix_idx, each = bveclength),
+    rep(cv_gmix_idx, each = bveclength),
+    rep(seq(p), each = bveclength)
+  )
   bhat_mx <- matrix(beta[bhat_select], nrow = bveclength, ncol = p)
-  bhat_tens <-  array(0, dim = c(p, p, q + 1))
+  bhat_tens <- array(0, dim = c(p, p, q + 1))
   for (i in seq_len(p)) {
     bhat_tens[i, -i, ] <- -bhat_mx[, i] / varhat[i]
   }
 
   bhat_symm <- abind::abind(
-    apply(bhat_tens, 3, symmetrize, simplify = FALSE), along = 3)
+    apply(bhat_tens, 3, symmetrize, simplify = FALSE),
+    along = 3
+  )
 
-  outlist <- list(gamma = ghat_mx,
-                  beta = bhat_symm,
-                  sigma2 = varhat,
-                  lambdapath = lambdas,
-                  sglmixpath = sglmixpath,
-                  gmixpath = gmixpath,
-                  cv_lambda_idx = cv_lambda_idx,
-                  cv_sglmix_idx = cv_sglmix_idx,
-                  cv_gmix_idx = cv_gmix_idx,
-                  cv_mse = cv_mse)
+  outlist <- list(
+    gamma = ghat_mx,
+    beta = bhat_symm,
+    sigma2 = varhat,
+    lambdapath = lambdas,
+    sglmixpath = sglmixpath,
+    gmixpath = gmixpath,
+    cv_lambda_idx = cv_lambda_idx,
+    cv_sglmix_idx = cv_sglmix_idx,
+    cv_gmix_idx = cv_gmix_idx,
+    cv_mse = cv_mse
+  )
   class(outlist) <- "ncagr"
 
   return(outlist)
