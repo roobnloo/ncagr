@@ -1,4 +1,4 @@
-#' @return n x q(p-1) matrix representing interactions btw responses and covs
+#' @return n x (q+1)(p-1) matrix representing interactions btw responses and covs
 #' @noRd
 
 intxmx <- function(responses, covariates) {
@@ -22,4 +22,9 @@ symmetrize <- function(mx, rule = "and") {
     result <- mx * (abs(mx) >= t(abs(mx))) + t(mx) * (t(abs(mx)) >= abs(mx))
   }
   return(result)
+}
+
+symmetrize_sparse <- function(mx) {
+  mx[-which(abs(mx) > 0 & (abs(t(mx)) > 0))] <- 0
+  mx
 }
