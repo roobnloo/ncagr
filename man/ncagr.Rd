@@ -7,7 +7,7 @@
 ncagr(
   responses,
   covariates,
-  gmixpath = seq(0, 1, by = 0.1),
+  gmixpath = seq(0, 0.9, by = 0.1),
   sglmixpath = 0.75,
   nlambda = 100,
   lambdafactor = 1e-08,

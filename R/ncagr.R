@@ -32,74 +32,54 @@ ncagr <- function(responses, covariates, gmixpath = seq(0, 0.9, by = 0.1),
 
   p <- ncol(responses)
   q <- ncol(covariates)
-  n <- nrow(responses)
   bveclength <- (p - 1) * (q + 1)
 
   # Initial run to get lambdas for each response
   ngmix <- length(gmixpath)
-  nsglmix <- length(sglmixpath)
-  lambdas <- matrix(nrow = nlambda, ncol = p)
+  # nsglmix <- length(sglmixpath)
+  lambda <- matrix(nrow = nlambda, ncol = p)
   beta <- matrix(nrow = p, ncol = bveclength)
   gamma <- matrix(nrow = p, ncol = q)
-  sigma2 <- numeric(p)
-  resid <- array(dim = c(n, nlambda, nsglmix, ngmix, p))
-  objval <- array(dim = c(nlambda, nsglmix, ngmix, p))
   l1_weights <- matrix(nrow = q + bveclength, ncol = p)
   l2_weights <- matrix(nrow = q, ncol = p)
   cvm <- array(dim = c(nlambda, ngmix, p))
+  sigma2 <- numeric(p)
+  mse <- numeric(p)
+  cv_lambda_idx <- numeric(p)
+  cv_gmix_idx <- numeric(p)
 
   cov_sds <- apply(covariates, 2, stats::sd)
   cov_scale <- scale(covariates)
   intx <- intxmx(responses, covariates)
   intx_sds <- apply(intx, 2, sd)
   intx_scale <- scale(intx)
-  lambdapath <- exp(seq(log(300), log(lambdafactor), length = nlambda))
 
   nodewise <- function(node) {
-    # if (verbose)
-    #   print(paste("Starting initial run for node", node))
     y <- responses[, node] - mean(responses[, node])
     intx_scale_node <- intx_scale[, -(seq(0, q) * p + node)]
-
-    wl1 <- rep(1, q + bveclength)
-    wl2 <- rep(1, q)
-    if (adaptive) {
-      fit_ridge <- glmnet::glmnet(cbind(cov_scale, intx_scale_node), y, alpha = 0, standardize = FALSE, intercept = FALSE)
-      co <- stats::coef(fit_ridge, s = fit_ridge$lambda[50], exact = TRUE)@x
-      wl1 <- 1 / abs(co)
-      # wl1[wl1 > 2000] <- 2000
-      # indices of U, X, without interactions
-      ux_id <- 1:(q + p - 1)
-      wgroups <- co[-ux_id]
-      # Compute weights for each group
-      wl2 <- 1 / sapply(split(wgroups, rep(seq_len(q), each = p - 1)), \(x) sqrt(sum(x^2)))
-      # wl2[wl2 > 2000] <- 2000
-    }
-
     nodereg <- cv_ncagr_node(
-      y, cbind(cov_scale, intx_scale_node), sglmixpath, lambdapath, gmixpath,
-      wl1 = wl1, wl2 = wl2,
-      maxit = maxit, tol = tol, nfolds = nfolds
+      y, cbind(cov_scale, intx_scale_node), p, q, nlambda, lambdafactor, gmixpath, sglmixpath,
+      maxit, tol, nfolds, adaptive
     )
     if (verbose) {
-      message("Finished initial run for node ", node)
+      message(node, " ", appendLF = FALSE)
     }
+
     return(list(
-      # lambdas = nodereg["lambdapath"][[1]],
-      beta = nodereg[["beta"]] / intx_sds[-(seq(0, q) * p + node)],
-      gamma = nodereg[["gamma"]] / cov_sds,
-      rss = nodereg$rss,
-      cvm = nodereg[["cvm"]],
-      min_lambda_idx = nodereg$cv_lambda_idx,
-      min_gmix_idx = nodereg$cv_gmix_idx,
-      # resid = nodereg["resid"][[1]],
-      # objval = nodereg["objval"][[1]],
-      wl1 = wl1,
-      wl2 = wl2
+      gamma = nodereg$gamma / cov_sds,
+      beta = nodereg$beta / intx_sds[-(seq(0, q) * p + node)],
+      sigma2 = nodereg$sigma2,
+      mse = nodereg$mse,
+      lambda = nodereg$lambda,
+      cvm = nodereg$cvm,
+      cv_lambda_idx = nodereg$cv_lambda_idx,
+      cv_gmix_idx = nodereg$cv_gmix_idx,
+      wl1 = nodereg$wl1,
+      wl2 = nodereg$wl2
     ))
   }
 
-  message("Begin initial run...\n")
+  message("Running nodewise regressions...")
 
   if (ncores > 1) {
     reg_result <- parallel::mclapply(seq_len(p), nodewise, mc.cores = ncores)
@@ -108,81 +88,23 @@ ncagr <- function(responses, covariates, gmixpath = seq(0, 0.9, by = 0.1),
   }
 
   for (node in seq_len(p)) {
-    # lambdas[, node] <- reg_result[[node]]$lambdas
-    beta[node, ] <- reg_result[[node]]$beta
     gamma[node, ] <- reg_result[[node]]$gamma
-    sigma2[node] <- reg_result[[node]]$rss
+    beta[node, ] <- reg_result[[node]]$beta
+    sigma2[node] <- reg_result[[node]]$sigma2
+    mse[node] <- reg_result[[node]]$mse
+    lambda[, node] <- reg_result[[node]]$lambda
     cvm[, , node] <- reg_result[[node]]$cvm
-    # resid[, , , , node] <- reg_result[[node]]$resid
-    # objval[, , , node] <- reg_result[[node]]$objval
+    cv_lambda_idx[node] <- reg_result[[node]]$cv_lambda_idx
+    cv_gmix_idx[node] <- reg_result[[node]]$cv_gmix_idx
     l1_weights[, node] <- reg_result[[node]]$wl1
     l2_weights[, node] <- reg_result[[node]]$wl2
   }
 
-  message("Finished initial run")
-  message("Begin cross-validation...")
+  message("\nFinished regressions.")
 
-  # cv_lambda_idx <- vector(length = p)
-  # cv_sglmix_idx <- vector(length = p)
-  # cv_gmix_idx <- vector(length = p)
-  # cv_mse <- array(dim = c(p, nlambda, nsglmix, ngmix))
-
-  # cv_node <- function(node) {
-  #   cv_result <- cv_ncagr_node(
-  #     responses[, node], responses[, -node], covariates, sglmixpath,
-  #     lambdas[, node], gmixpath, l1_weights[, node], l2_weights[, node],
-  #     maxit, tol, nfolds
-  #   )
-  #   if (verbose) {
-  #     message("Done cross-validating node ", node)
-  #   }
-  #   return(cv_result)
-  # }
-
-  # if (ncores > 1) {
-  #   cv_results <- parallel::mclapply(seq_len(p), cv_node, mc.cores = ncores)
-  # } else {
-  #   cv_results <- lapply(seq_len(p), cv_node)
-  # }
-
-  # if (any(sapply(cv_results, inherits, what = "try-error"))) {
-  #   browser()
-  # }
-
-  # for (node in seq_len(p)) {
-  #   cv_mse[node, , , ] <- cv_results[[node]]
-  #   minind <- arrayInd(which.min(cv_results[[node]]), dim(cv_results[[node]]))
-  #   cv_lambda_idx[node] <- minind[1]
-  #   cv_sglmix_idx[node] <- minind[2]
-  #   cv_gmix_idx[node] <- minind[3]
-  # }
-
-  message("Finished cross validating all nodes")
-
-  # ghat_select <- cbind(
-  #   rep(seq(q), times = p),
-  #   rep(cv_lambda_idx, each = q),
-  #   rep(cv_sglmix_idx, each = q),
-  #   rep(cv_gmix_idx, each = q),
-  #   rep(seq(p), each = q)
-  # )
-  # ghat_mx <- t(gamma)
-  ghat_mx <- gamma
-
-  # varhat <- varhat[cbind(cv_lambda_idx, cv_sglmix_idx, cv_gmix_idx, seq(p))]
-
-  # bhat_select <- cbind(
-  #   rep(seq(bveclength), times = p),
-  #   rep(cv_lambda_idx, each = bveclength),
-  #   rep(cv_sglmix_idx, each = bveclength),
-  #   rep(cv_gmix_idx, each = bveclength),
-  #   rep(seq(p), each = bveclength)
-  # )
-  # bhat_mx <- matrix(beta[bhat_select], nrow = bveclength, ncol = p)
-  bhat_mx <- beta
   bhat_tens <- array(0, dim = c(p, p, q + 1))
   for (i in seq_len(p)) {
-    bhat_tens[i, -i, ] <- -bhat_mx[i, ]# / sigma2[i]
+    bhat_tens[i, -i, ] <- -beta[i, ] # / sigma2[i]
   }
 
   # for (i in seq_len(q+1)) {
@@ -190,8 +112,6 @@ ncagr <- function(responses, covariates, gmixpath = seq(0, 0.9, by = 0.1),
   # }
 
   for (i in seq_len(p)) {
-    nnz <- sum(abs(bhat_tens[i, -i, ]) > 0)
-    sigma2[i] <- sigma2[i] / (n - nnz)
     bhat_tens[i, -i, ] <- bhat_tens[i, -i, ] / sigma2[i]
   }
 
@@ -201,19 +121,20 @@ ncagr <- function(responses, covariates, gmixpath = seq(0, 0.9, by = 0.1),
   )
 
   outlist <- list(
-    gamma = ghat_mx,
+    gamma = gamma,
     beta = bhat_symm,
     beta_raw = bhat_tens,
     sigma2 = sigma2,
-    # lambdapath = lambdas,
+    mse = mse,
+    lambda = lambda,
     sglmixpath = sglmixpath,
     gmixpath = gmixpath,
     cvm = cvm,
+    cv_lambda_idx = cv_lambda_idx,
+    # cv_sglmix_idx = cv_sglmix_idx,
+    cv_gmix_idx = cv_gmix_idx,
     l1_weights = l1_weights,
     l2_weights = l2_weights
-    # cv_lambda_idx = cv_lambda_idx,
-    # cv_sglmix_idx = cv_sglmix_idx,
-    # cv_gmix_idx = cv_gmix_idx,
   )
   class(outlist) <- "ncagr"
 
