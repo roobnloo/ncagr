@@ -54,12 +54,12 @@ ncagr <- function(responses, covariates, gmixpath = seq(0, 0.9, by = 0.1),
   intx_sds <- apply(intx, 2, sd)
   intx_scale <- scale(intx)
 
-  nodewise <- function(node) {
+  nodewise <- function(node, sigma2 = NULL) {
     y <- responses[, node] - mean(responses[, node])
     intx_scale_node <- intx_scale[, -(seq(0, q) * p + node)]
     nodereg <- cv_ncagr_node(
       y, cbind(cov_scale, intx_scale_node), p, q, nlambda, lambdafactor, gmixpath, sglmixpath,
-      maxit, tol, nfolds, adaptive
+      maxit, tol, nfolds, sigma2
     )
     if (verbose) {
       message(node, " ", appendLF = FALSE)
@@ -102,17 +102,32 @@ ncagr <- function(responses, covariates, gmixpath = seq(0, 0.9, by = 0.1),
 
   message("\nFinished regressions.")
 
-  bhat_tens <- array(0, dim = c(p, p, q + 1))
-  for (i in seq_len(p)) {
-    bhat_tens[i, -i, ] <- -beta[i, ] # / sigma2[i]
+  if (adaptive) {
+    message("Running nodewise regressions with adaptive weights...")
+    if (ncores > 1) {
+      reg_result <- parallel::mclapply(seq_len(p), \(i) nodewise(i, sigma2[i]), mc.cores = ncores)
+    } else {
+      reg_result <- lapply(seq_len(p), \(i) nodewise(i, sigma2[i]))
+    }
+
+    for (node in seq_len(p)) {
+      gamma[node, ] <- reg_result[[node]]$gamma
+      beta[node, ] <- reg_result[[node]]$beta
+      sigma2[node] <- reg_result[[node]]$sigma2
+      mse[node] <- reg_result[[node]]$mse
+      lambda[, node] <- reg_result[[node]]$lambda
+      cvm[, , node] <- reg_result[[node]]$cvm
+      cv_lambda_idx[node] <- reg_result[[node]]$cv_lambda_idx
+      cv_gmix_idx[node] <- reg_result[[node]]$cv_gmix_idx
+      l1_weights[, node] <- reg_result[[node]]$wl1
+      l2_weights[, node] <- reg_result[[node]]$wl2
+    }
+    message("\nFinished adaptive regressions.")
   }
 
-  # for (i in seq_len(q+1)) {
-  #   bhat_tens[, , i] <- symmetrize_sparse(bhat_tens[, , i])
-  # }
-
+  bhat_tens <- array(0, dim = c(p, p, q + 1))
   for (i in seq_len(p)) {
-    bhat_tens[i, -i, ] <- bhat_tens[i, -i, ] / sigma2[i]
+    bhat_tens[i, -i, ] <- -beta[i, ] / sigma2[i]
   }
 
   bhat_symm <- abind::abind(

@@ -1,5 +1,6 @@
 cv_ncagr_node <- function(y, uw, p, q, nlambda, lambda_factor, gmixpath, sglmixpath,
-                          maxit, tol, nfolds, adaptive, sigma2 = NULL) {
+                          maxit, tol, nfolds, sigma2) {
+  adaptive <- !is.null(sigma2)
   n <- length(y)
   nvars <- q + (p - 1) * (q + 1)
   lam_max <- max(abs(t(uw) %*% y))
@@ -14,15 +15,16 @@ cv_ncagr_node <- function(y, uw, p, q, nlambda, lambda_factor, gmixpath, sglmixp
   cvm_mx <- matrix(0, nrow = length(lambda), ncol = length(gmixpath))
   coefs <- matrix(nrow = nvars, ncol = length(gmixpath))
   mse <- numeric(length(gmixpath))
+  df <- numeric(length(gmixpath))
 
   wl1 <- rep(1, nvars)
   wl2 <- rep(1, q)
   if (adaptive) {
-    fit_ridge <- glmnet::cv.glmnet(
+    fit_ridge <- glmnet::glmnet(
       uw, y,
       alpha = 0, standardize = FALSE, intercept = FALSE
     )
-    co <- stats::coef(fit_ridge, s = fit_ridge$lambda.min)@x
+    co <- stats::coef(fit_ridge, s = fit_ridge$lambda[100])@x
     wl1 <- 1 / abs(co)
     # indices of U, X, without interactions
     ux_id <- 1:(q + p - 1)
@@ -46,25 +48,27 @@ cv_ncagr_node <- function(y, uw, p, q, nlambda, lambda_factor, gmixpath, sglmixp
     )
     lambda_min_ind <- which.min(sgl1$cvm)
     fit <- sgl1$sparsegl.fit
+    # risk <- sparsegl::estimate_risk(fit, uw)
+    df[agid] <- fit$df[lambda_min_ind]
     coefs[, agid] <- as.numeric(fit$beta[, lambda_min_ind])
     mse[agid] <- fit$mse[lambda_min_ind]
     cvm_mx[, agid] <- sgl1$cvm
   }
 
   cv_ind <- arrayInd(which.min(cvm_mx), dim(cvm_mx))
-  gamma <- coefs[1:q, cv_ind[2]]
-  beta <- coefs[(q + 1):nvars, cv_ind[2]]
-  nnz <- sum(abs(beta) > 1e-10)
+  gmix_min_ind <- cv_ind[2]
+  gamma <- coefs[1:q, gmix_min_ind]
+  beta <- coefs[(q + 1):nvars, gmix_min_ind]
 
   if (is.null(sigma2)) {
-    sigma2 <- mse[cv_ind[2]] * n / nnz
+    sigma2 <- mse[gmix_min_ind] * n / (n - df[gmix_min_ind])
   }
 
   return(list(
     gamma = gamma,
     beta = beta,
     sigma2 = sigma2,
-    mse = mse[cv_ind[2]],
+    mse = mse[gmix_min_ind],
     lambda = lambda,
     cvm = cvm_mx,
     cv_lambda_idx = cv_ind[1],
