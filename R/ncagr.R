@@ -7,7 +7,7 @@
 #' @param nlambda The number of lambda values to use for cross-validation - default is 100.
 #' @param lambdafactor The smallest value of lambda as a fraction of the maximum lambda.
 #' @param maxit The maximum number of iterations. Default is \eqn{3\times 10^6}.
-#' @param tol The convergence threshhold for optimization. Default is \eqn{10^{-6}}.
+#' @param tol The convergence threshhold for optimization. Default is \eqn{10^{-10}}.
 #' @param nfolds Number of folds for cross-validation. Default is 5.
 #' @param verbose If TRUE, prints progress messages. Default is TRUE.
 #' @param ncores Runs the nodewise regressions in parallel using that many cores. Default is 1.
@@ -21,7 +21,7 @@
 #' @export
 ncagr <- function(responses, covariates, gmixpath = seq(0, 0.9, by = 0.1),
                   sglmixpath = 0.75, nlambda = 100,
-                  lambdafactor = 1e-8, maxit = 3e6, tol = 1e-6, nfolds = 5,
+                  lambdafactor = 1e-8, maxit = 3e6, tol = 1e-10, nfolds = 5,
                   verbose = TRUE, ncores = 1, adaptive = TRUE) {
   stopifnot(
     is.matrix(responses), is.matrix(covariates),
