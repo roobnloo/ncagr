@@ -23,8 +23,3 @@ symmetrize <- function(mx, rule = "and") {
   }
   return(result)
 }
-
-symmetrize_sparse <- function(mx) {
-  mx[-which(abs(mx) > 0 & (abs(t(mx)) > 0))] <- 0
-  mx
-}

@@ -12,11 +12,11 @@
 #' @param verbose If TRUE, prints progress messages. Default is TRUE.
 #' @param ncores Runs the nodewise regressions in parallel using that many cores. Default is 1.
 #' @param adaptive Use adaptive weights when fitting nodewise regressions. Default is TRUE.
-#' @useDynLib ncagr
-#' @importFrom Rcpp sourceCpp
 #' @importFrom abind abind
 #' @importFrom Matrix colMeans colSums
 #' @importFrom stats sd
+#' @importFrom sparsegl sparsegl
+#' @importFrom glmnet glmnet
 #' @import parallel
 #' @export
 ncagr <- function(responses, covariates, gmixpath = seq(0, 0.9, by = 0.1),
