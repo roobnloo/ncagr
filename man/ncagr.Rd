@@ -12,11 +12,11 @@ ncagr(
   nlambda = 100,
   lambdafactor = 1e-08,
   maxit = 3e+06,
-  tol = 1e-06,
+  tol = 1e-10,
   nfolds = 5,
   verbose = TRUE,
   ncores = 1,
-  adaptive = TRUE
+  adaptive = FALSE
 )
 }
 \arguments{
@@ -34,7 +34,7 @@ ncagr(
 
 \item{maxit}{The maximum number of iterations. Default is \eqn{3\times 10^6}.}
 
-\item{tol}{The convergence threshhold for optimization. Default is \eqn{10^{-6}}.}
+\item{tol}{The convergence threshhold for optimization. Default is \eqn{10^{-10}}.}
 
 \item{nfolds}{Number of folds for cross-validation. Default is 5.}
 
@@ -42,7 +42,7 @@ ncagr(
 
 \item{ncores}{Runs the nodewise regressions in parallel using that many cores. Default is 1.}
 
-\item{adaptive}{Use adaptive weights when fitting nodewise regressions. Default is TRUE.}
+\item{adaptive}{Use adaptive weights when fitting nodewise regressions. Default is FALSE.}
 }
 \description{
 Run Natural Covariate-adjusted Graphical Regression

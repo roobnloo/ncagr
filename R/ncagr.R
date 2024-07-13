@@ -11,7 +11,7 @@
 #' @param nfolds Number of folds for cross-validation. Default is 5.
 #' @param verbose If TRUE, prints progress messages. Default is TRUE.
 #' @param ncores Runs the nodewise regressions in parallel using that many cores. Default is 1.
-#' @param adaptive Use adaptive weights when fitting nodewise regressions. Default is TRUE.
+#' @param adaptive Use adaptive weights when fitting nodewise regressions. Default is FALSE. 
 #' @importFrom abind abind
 #' @importFrom Matrix colMeans colSums
 #' @importFrom stats sd
@@ -22,7 +22,7 @@
 ncagr <- function(responses, covariates, gmixpath = seq(0, 0.9, by = 0.1),
                   sglmixpath = 0.75, nlambda = 100,
                   lambdafactor = 1e-8, maxit = 3e6, tol = 1e-10, nfolds = 5,
-                  verbose = TRUE, ncores = 1, adaptive = TRUE) {
+                  verbose = TRUE, ncores = 1, adaptive = FALSE) {
   stopifnot(
     is.matrix(responses), is.matrix(covariates),
     nrow(responses) == nrow(covariates),
@@ -48,11 +48,9 @@ ncagr <- function(responses, covariates, gmixpath = seq(0, 0.9, by = 0.1),
   cv_lambda_idx <- numeric(p)
   cv_gmix_idx <- numeric(p)
 
-  cov_sds <- apply(covariates, 2, stats::sd)
-  cov_scale <- scale(covariates)
+  cov_scale <- scale(covariates, scale = FALSE)
   intx <- intxmx(responses, covariates)
-  intx_sds <- apply(intx, 2, sd)
-  intx_scale <- scale(intx)
+  intx_scale <- scale(intx, scale = FALSE)
 
   nodewise <- function(node, sigma2 = NULL) {
     y <- responses[, node] - mean(responses[, node])
@@ -66,8 +64,8 @@ ncagr <- function(responses, covariates, gmixpath = seq(0, 0.9, by = 0.1),
     }
 
     return(list(
-      gamma = nodereg$gamma / cov_sds,
-      beta = nodereg$beta / intx_sds[-(seq(0, q) * p + node)],
+      gamma = nodereg$gamma,
+      beta = nodereg$beta,
       sigma2 = nodereg$sigma2,
       mse = nodereg$mse,
       lambda = nodereg$lambda,

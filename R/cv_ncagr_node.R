@@ -22,7 +22,7 @@ cv_ncagr_node <- function(y, uw, p, q, nlambda, lambda_factor, gmixpath, sglmixp
   if (adaptive) {
     fit_ridge <- glmnet::glmnet(
       uw, y,
-      alpha = 0, standardize = FALSE, intercept = FALSE
+      alpha = 0, standardize = TRUE, intercept = FALSE
     )
     co <- stats::coef(fit_ridge, s = fit_ridge$lambda[100])@x
     wl1 <- 1 / abs(co)
@@ -44,7 +44,7 @@ cv_ncagr_node <- function(y, uw, p, q, nlambda, lambda_factor, gmixpath, sglmixp
       foldid = foldid,
       lambda = anorm * lambda,
       pf_group = pf_group, pf_sparse = pf_sparse,
-      asparse = sglmixpath, standardize = FALSE, intercept = FALSE
+      asparse = sglmixpath, standardize = TRUE, intercept = FALSE
     )
     lambda_min_ind <- which.min(sgl1$cvm)
     fit <- sgl1$sparsegl.fit
