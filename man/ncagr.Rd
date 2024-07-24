@@ -16,7 +16,7 @@ ncagr(
   nfolds = 5,
   verbose = TRUE,
   ncores = 1,
-  adaptive = TRUE
+  adaptive = FALSE
 )
 }
 \arguments{
@@ -42,7 +42,7 @@ ncagr(
 
 \item{ncores}{Runs the nodewise regressions in parallel using that many cores. Default is 1.}
 
-\item{adaptive}{Use adaptive weights when fitting nodewise regressions. Default is TRUE.}
+\item{adaptive}{Use adaptive weights when fitting nodewise regressions. Default is FALSE.}
 }
 \description{
 Run Natural Covariate-adjusted Graphical Regression

@@ -107,7 +107,8 @@ double objective(const VectorXd &residual, const VectorXd &gamma,
   for (int i = 1; i < beta.cols(); ++i) {
     group_lasso_obj += wl2[i - 1] * beta.col(i).norm();
   }
-  double result = quad_loss + regmean * mean_obj + sglmix * lambda * lasso_obj +
+  double result = quad_loss + sglmix * regmean * mean_obj +
+                  sglmix * lambda * lasso_obj +
                   (1 - sglmix) * lambda * group_lasso_obj;
   return result;
 }
@@ -298,7 +299,8 @@ RegressionResult nodewiseRegressionInit(
   for (int i = 0; i < maxit; ++i) {
     double prevMaxNorm = maxNorm;
     // applyRidgeUpdate(gamma, residual, covariates, regmean);
-    applyL1Update(gamma, residual, covariates, regmean, gamma_l1_weights);
+    applyL1Update(gamma, residual, covariates, sglmix * regmean,
+                  gamma_l1_weights);
     applyL1Update(beta.col(0), residual, response, sglmix * lambda,
                   beta0_l1_weights);
 

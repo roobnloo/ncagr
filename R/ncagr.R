@@ -11,7 +11,7 @@
 #' @param nfolds Number of folds for cross-validation. Default is 5.
 #' @param verbose If TRUE, prints progress messages. Default is TRUE.
 #' @param ncores Runs the nodewise regressions in parallel using that many cores. Default is 1.
-#' @param adaptive Use adaptive weights when fitting nodewise regressions. Default is TRUE.
+#' @param adaptive Use adaptive weights when fitting nodewise regressions. Default is FALSE.
 #' @useDynLib ncagr
 #' @importFrom Rcpp sourceCpp
 #' @importFrom abind abind
@@ -22,7 +22,7 @@
 ncagr <- function(responses, covariates, gmixpath = seq(0, 1, by = 0.1),
                   sglmixpath = 0.75, nlambda = 100,
                   lambdafactor = 1e-8, maxit = 3e6, tol = 1e-6, nfolds = 5,
-                  verbose = TRUE, ncores = 1, adaptive = TRUE) {
+                  verbose = TRUE, ncores = 1, adaptive = FALSE) {
   stopifnot(
     is.matrix(responses), is.matrix(covariates),
     nrow(responses) == nrow(covariates),
