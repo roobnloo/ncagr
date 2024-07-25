@@ -21,7 +21,7 @@
 #' @export
 ncagr <- function(responses, covariates, gmixpath = seq(0, 1, by = 0.1),
                   sglmixpath = 0.75, nlambda = 100,
-                  lambdafactor = 1e-8, maxit = 3e6, tol = 1e-6, nfolds = 5,
+                  lambdafactor = 1e-6, maxit = 3e6, tol = 1e-6, nfolds = 5,
                   verbose = TRUE, ncores = 1, adaptive = FALSE) {
   stopifnot(
     is.matrix(responses), is.matrix(covariates),
