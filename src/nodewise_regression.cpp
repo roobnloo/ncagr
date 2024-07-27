@@ -204,23 +204,11 @@ void applySparseGLUpdate(Ref<VectorXd> beta_grp, VectorXd &residual,
   return;
 }
 
-// TODO: we can consider thresholding the number of nonzero entries here.
 double estimateVariance(const VectorXd &residual, const VectorXd &gamma,
                         const MatrixXd &beta) {
-  int numNonZero =
-      (beta.array().abs() > 0).count(); // + (gamma.array().abs() > 0).count();
-  // int nnZeroGroups = 0;
-  // for (int i = 1; i < beta.cols(); ++i)
-  // {
-  //     if ((beta.col(i).array().abs() > 0).any())
-  //     {
-  //         ++nnZeroGroups;
-  //     }
-  // }
-  // int nnZeroPop = (beta.col(0).array().abs() > 0).count();
-  // double varhat = residual.squaredNorm() / (residual.rows() - 1 -
-  // nnZeroGroups - nnZeroPop);
-  double varhat = residual.squaredNorm() / (residual.rows() - numNonZero);
+  int nnz =
+      (beta.array().abs() > 0).count() + (gamma.array().abs() > 0).count();
+  double varhat = residual.squaredNorm() / (residual.rows() - nnz);
   if (varhat < 0)
     varhat = 1;
   return varhat;
@@ -286,7 +274,6 @@ RegressionResult nodewiseRegressionInit(
   int p = response.cols() + 1;
   int q = covariates.cols();
   beta.resize(p - 1, q + 1);
-  // regmean *= sqrt(q); // Adjust for group size
 
   VectorXd residual = y - covariates * gamma - response * beta.col(0);
   for (int i = 0; i < (int)intxs.size(); ++i) {

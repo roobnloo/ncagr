@@ -21,7 +21,7 @@
 #' @export
 ncagr <- function(responses, covariates, gmixpath = seq(0, 1, by = 0.1),
                   sglmixpath = 0.75, nlambda = 100,
-                  lambdafactor = 1e-6, maxit = 3e6, tol = 1e-6, nfolds = 5,
+                  lambdafactor = 1e-6, maxit = 3e6, tol = 1e-10, nfolds = 5,
                   verbose = TRUE, ncores = 1, adaptive = FALSE) {
   stopifnot(
     is.matrix(responses), is.matrix(covariates),
@@ -208,17 +208,18 @@ ncagr <- function(responses, covariates, gmixpath = seq(0, 1, by = 0.1),
   bhat_mx <- matrix(beta[bhat_select], nrow = bveclength, ncol = p)
   bhat_tens <- array(0, dim = c(p, p, q + 1))
   for (i in seq_len(p)) {
-    bhat_tens[i, -i, ] <- -bhat_mx[, i] / varhat[i]
+    bhat_tens[i, -i, ] <- bhat_mx[, i]
   }
 
   bhat_symm <- abind::abind(
-    apply(bhat_tens, 3, symmetrize, simplify = FALSE),
+    apply(bhat_tens, 3, \(b) diag(varhat) %*% symmetrize(b), simplify = FALSE),
     along = 3
   )
 
   outlist <- list(
     gamma = ghat_mx,
     beta = bhat_symm,
+    beta_raw = bhat_tens,
     sigma2 = varhat,
     lambdapath = lambdas,
     sglmixpath = sglmixpath,

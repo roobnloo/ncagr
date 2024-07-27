@@ -4,12 +4,12 @@
 \alias{predict.ncagr}
 \title{Predict from a 'ncagr' object}
 \usage{
-\method{predict}{ncagr}(fit, newcovar)
+\method{predict}{ncagr}(fit, u)
 }
 \arguments{
 \item{fit}{An object of class [ncagr].}
 
-\item{newcovar}{A vector of covariates.}
+\item{u}{A vector of covariates.}
 }
 \value{
 A list with components 'precision', the predicted precision matrix,
