@@ -30,7 +30,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/* /tmp/library-scripts
 
 ### R compiler settings
-RUN R -e "dotR <- file.path(Sys.getenv('HOME'), '.R'); if(!file.exists(dotR)){ dir.create(dotR) }; Makevars <- file.path(dotR, 'Makevars'); if (!file.exists(Makevars)){  file.create(Makevars) }; cat('\nCXXFLAGS=-O3 -fPIC -Wno-unused-variable -Wno-unused-function -Wno-ignored-attributes', 'CXX = g++', 'CXX11 = g++', file = Makevars, sep = '\n', append = TRUE)"
+RUN R -e "dotR <- file.path(Sys.getenv('HOME'), '.R'); if(!file.exists(dotR)){ dir.create(dotR) }; Makevars <- file.path(dotR, 'Makevars'); if (!file.exists(Makevars)){  file.create(Makevars) }; cat('CXXFLAGS=-O3 -fPIC -Wno-unused-variable -Wno-unused-function -Wno-ignored-attributes', 'CXX = g++', 'CXX11 = g++', file = Makevars, sep = '\n', append = TRUE)"
 RUN chmod 666 ${HOME}/.R/Makevars
 
 ### CRAN mirror
@@ -82,7 +82,7 @@ RUN R -q -e 'remotes::install_version("markdown", version="1.12", repos="cloud.r
     ### Example (note the `&& \` after the command):       ###
     ### R -q -e 'install.packages("dplyr")' && \           ###
     ##########################################################
-    R -q -e 'install.packages(c("RcppEigen", "abind", "CVXR"))' && \
+    R -q -e 'install.packages(c("RcppEigen", "CVXR"))' && \
     echo
 
 ### GitHub CLI Installation

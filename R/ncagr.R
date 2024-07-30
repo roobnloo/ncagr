@@ -14,14 +14,13 @@
 #' @param adaptive Use adaptive weights when fitting nodewise regressions. Default is FALSE.
 #' @useDynLib ncagr
 #' @importFrom Rcpp sourceCpp
-#' @importFrom abind abind
 #' @importFrom Matrix colMeans colSums
 #' @importFrom stats sd
 #' @import parallel
 #' @export
 ncagr <- function(responses, covariates, gmixpath = seq(0, 1, by = 0.1),
                   sglmixpath = 0.75, nlambda = 100,
-                  lambdafactor = 1e-6, maxit = 3e6, tol = 1e-10, nfolds = 5,
+                  lambdafactor = 1e-6, maxit = 3e6, tol = 1e-6, nfolds = 5,
                   verbose = TRUE, ncores = 1, adaptive = FALSE) {
   stopifnot(
     is.matrix(responses), is.matrix(covariates),
@@ -211,10 +210,10 @@ ncagr <- function(responses, covariates, gmixpath = seq(0, 1, by = 0.1),
     bhat_tens[i, -i, ] <- bhat_mx[, i]
   }
 
-  bhat_symm <- abind::abind(
-    apply(bhat_tens, 3, \(b) diag(varhat) %*% symmetrize(b), simplify = FALSE),
-    along = 3
-  )
+  bhat_symm <- array(0, dim = c(p, p, q + 1))
+  for (h in seq_len(q + 1)) {
+    bhat_symm[, , h] <- diag(varhat) %*% symmetrize(bhat_tens[, , h])
+  }
 
   outlist <- list(
     gamma = ghat_mx,

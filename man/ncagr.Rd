@@ -12,7 +12,7 @@ ncagr(
   nlambda = 100,
   lambdafactor = 1e-06,
   maxit = 3e+06,
-  tol = 1e-10,
+  tol = 1e-06,
   nfolds = 5,
   verbose = TRUE,
   ncores = 1,

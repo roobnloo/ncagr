@@ -206,8 +206,8 @@ void applySparseGLUpdate(Ref<VectorXd> beta_grp, VectorXd &residual,
 
 double estimateVariance(const VectorXd &residual, const VectorXd &gamma,
                         const MatrixXd &beta) {
-  int nnz =
-      (beta.array().abs() > 0).count() + (gamma.array().abs() > 0).count();
+  int nnz = (beta.array().abs() > 0).count() + 1;
+  // + (gamma.array().abs() > 0).count();
   double varhat = residual.squaredNorm() / (residual.rows() - nnz);
   if (varhat < 0)
     varhat = 1;
