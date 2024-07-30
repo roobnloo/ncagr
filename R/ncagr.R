@@ -212,7 +212,7 @@ ncagr <- function(responses, covariates, gmixpath = seq(0, 1, by = 0.1),
 
   bhat_symm <- array(0, dim = c(p, p, q + 1))
   for (h in seq_len(q + 1)) {
-    bhat_symm[, , h] <- diag(varhat) %*% symmetrize(bhat_tens[, , h])
+    bhat_symm[, , h] <- symmetrize(-diag(1 / varhat) %*% bhat_tens[, , h])
   }
 
   outlist <- list(

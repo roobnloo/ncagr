@@ -28,9 +28,8 @@ predict.ncagr <- function(fit, u) {
   if (length(u) != q) {
     stop("Expected covariate vector of length ", q, ".")
   }
-  theta <- apply(fit$beta, c(1, 2), \(b) b %*% c(1, u))
-  diag(theta) <- -1
-  omega <- -diag(1 / fit$sigma2) %*% theta
-  mu <- solve(-theta, fit$gamma %*% u)
+  omega <- apply(fit$beta, c(1, 2), \(b) b %*% c(1, u))
+  diag(omega) <- 1 / fit$sigma2
+  mu <- solve(diag(fit$sigma2) %*% omega, fit$gamma %*% u)
   return(list(precision = omega, mean = mu))
 }
