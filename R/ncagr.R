@@ -56,7 +56,8 @@ ncagr <- function(responses, covariates, gmixpath = seq(0, 1, by = 0.1),
     y <- responses[, node] - mean(responses[, node])
     intx_scale_node <- intx_scale[, -(seq(0, q) * p + node)]
 
-    wl1 <- rep(1, q + bveclength)
+    wl1 <- c(rep(1, q), rep(1 / (p - 1), bveclength))
+    wl1 <- (q + bveclength) * wl1 / sum(wl1)
     wl2 <- rep(1, q)
     if (adaptive) {
       fit_ridge <- glmnet::glmnet(
