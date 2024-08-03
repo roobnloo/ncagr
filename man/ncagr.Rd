@@ -7,10 +7,9 @@
 ncagr(
   responses,
   covariates,
-  gmixpath = seq(0, 0.9, by = 0.1),
   sglmixpath = 0.75,
   nlambda = 100,
-  lambdafactor = 1e-08,
+  lambdafactor = 1e-06,
   maxit = 3e+06,
   tol = 1e-10,
   nfolds = 5,
@@ -23,8 +22,6 @@ ncagr(
 \item{responses}{\eqn{n \times p} matrix of responses}
 
 \item{covariates}{\eqn{n \times q} matrix of covariates}
-
-\item{gmixpath}{A path of ncagr mixing parameters. Default is 0.1, 0.2, ..., 0.9.}
 
 \item{sglmixpath}{A path of sparse-group lasso mixing parameter with \eqn{0\leq \alpha \leq 1}. Default is 0.75.}
 
